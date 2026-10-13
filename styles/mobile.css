@@ -1,0 +1,167 @@
+/* ══════════════════════════════════════════════════════════════════
+   mobile · 触控尺寸与行为（方案设计.md §5.8 ②）
+   🔴 口径：**挂 body.is-mobile，绝不按视口宽度**。
+   手机横屏 844–932px 比很多平板断点还宽，写在 max-width 里的规则永不命中；
+   平板实测 UA 是 X11; Linux x86_64、视口 1238×731，却全是 touch 指针。
+   两条口径分开：布局看 data-w（JS 量容器宽），触控看 body.is-mobile。
+   ══════════════════════════════════════════════════════════════════ */
+body.is-mobile .kbw-root .kbw-btn {
+  min-height: var(--kbw-touch);
+  padding-left: var(--sp-4);
+  padding-right: var(--sp-4);
+}
+/* 竖条档（列形态下的收起态）：§2.1 说的 ~40px 是桌面口径，
+   触屏上凑够 44px 的触摸目标 —— 它是这一列**唯一**能点的东西，别让人点空 */
+body.is-mobile .kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-sect.is-collapsed {
+  width: 44px;
+}
+body.is-mobile .kbw-root .kbw-iconbtn { width: var(--kbw-touch); height: var(--kbw-touch); }
+body.is-mobile .kbw-root .kbw-navitem { height: 44px; }
+body.is-mobile .kbw-root .kbw-navfoot-row { min-height: 36px; }
+body.is-mobile .kbw-root .kbw-input { min-height: 40px; }
+body.is-mobile .kbw-root .kbw-multiselect { min-height: 44px; }
+body.is-mobile .kbw-root .kbw-multiselect-item { padding: 7px 8px; }
+body.is-mobile .kbw-root .kbw-multiselect-item .kbw-x {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+body.is-mobile .kbw-root .kbw-check { width: 20px; height: 20px; }
+body.is-mobile .kbw-root .kbw-switch { width: 40px; height: 24px; border-radius: 12px; }
+body.is-mobile .kbw-root .kbw-switch::after { width: 20px; height: 20px; }
+body.is-mobile .kbw-root .kbw-switch.is-on::after { transform: translateX(16px); }
+body.is-mobile .kbw-root .kbw-seg button { min-height: 40px; padding-left: var(--sp-3); padding-right: var(--sp-3); }
+body.is-mobile .kbw-root .kbw-dropdown-item { min-height: 44px; }
+
+/* 触屏没有悬停 → 说明气泡：长按 400ms 弹出（§5.9） */
+.kbw-bubble {
+  position: fixed;
+  z-index: var(--z-kbw-menu);
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: var(--kbw-menu-radius);
+  border: 1px solid var(--kbw-menu-border);
+  background-color: var(--kbw-menu-bg);
+  box-shadow: var(--kbw-menu-shadow);
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+  line-height: var(--lh-2);
+  pointer-events: none;
+  animation: kbw-pop var(--t-fast) var(--ease-enter);
+  transform-origin: var(--kbw-origin, 50% 100%);
+}
+
+/* 触屏：菜单项与模态按钮也放到 44px（原 32px 是桌面密度） */
+body.is-mobile .kbw-menu-item { height: 44px; }
+body.is-mobile .kbw-menu { min-width: 240px; }
+body.is-mobile .kbw-modal { max-width: none; max-height: calc(100vh - 24px); }
+body.is-mobile .kbw-backdrop { padding: var(--sp-3); align-items: flex-end; }
+
+/* 手机横屏时模态不要贴着底 */
+@media (orientation: landscape) {
+  body.is-mobile .kbw-backdrop { align-items: center; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   P1：全部笔记的触屏口径（S4 实测三条）
+   ══════════════════════════════════════════════════════════════════ */
+/* ① 长按拖动要抑制三层原生长按：CSS 两层在这里，第三层是 dnd.ts 的 contextmenu preventDefault */
+body.is-mobile .kbw-root .kbw-trow,
+/* P7.1b：详细档的文件夹行（触屏长按 → 我们那扇目录菜单；别让平台原生 callout 插一脚） */
+body.is-mobile .kbw-root .kbw-frow,
+body.is-mobile .kbw-root .kbw-tree-item,
+/* P6：网格档的格子也要压制 —— 触屏的长按双模式（400ms 选择 / 拖动）就建在这上面 */
+body.is-mobile .kbw-root .kbw-gcell,
+/**
+ * ⚠️ **看板卡片也要压制**（P6⑤ 独立审查 A1 指出的漏项）：卡片从 P4 起就有触屏长按拖动，
+ * P6⑤ 又加了"长按 400ms → 选择模式"，而这三层抑制的名单里**一直没有它** ——
+ * 名单里那三个是网格档补的，卡片当时漏了。漏的后果：平板长按 400ms 时，
+ * 平台自己那个约 500ms 的原生长按（文字选择 / 原生菜单）会叠上来抢手势
+ *（§3.5 那条注释原话就是这个风险，离线看不出、真机才看得出来）。
+ * ⚠️ 另一条同源的老账：`styles/base.css` 那组 `.kbw-pressable` 从 P0 起**没有任何生产者**
+ *（没有任何代码给它加类）—— 那是"写着像在用"的死规则，别照它推断覆盖面。
+ */
+body.is-mobile .kbw-root .kbw-card,
+/* P7.2a：首页区块（触屏长按整块 = 拖序起手；不让平台那个 ~500ms 的原生长按插一脚） */
+body.is-mobile .kbw-root .kbw-hblock {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/**
+ * ⚠️ **豁免区块里的输入框**（独立审查 🟢4）：`.kbw-hblock` 里装着搜索框
+ * （hero 块）—— 这是本项目第一个"user-select:none 容器里装 input"的形态。
+ * 文本选择照旧（不然触屏上没法选中/粘贴搜索词）。
+ */
+body.is-mobile .kbw-root .kbw-hblock input,
+body.is-mobile .kbw-root .kbw-hblock textarea {
+  -webkit-touch-callout: default;
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* ② 触屏**不做 ±7px 细命中区**（实测只覆盖 30%/21%）→ 换成看得见的 32px 抓手柄 */
+body.is-mobile .kbw-root .kbw-col-grip { right: -16px; width: 32px; }
+body.is-mobile .kbw-root .kbw-col-grip::after {
+  left: 15px;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--background-modifier-border-hover, var(--text-faint));
+}
+/* ③ 行高与触控目标：表格行给足高度（44 会太挤，36 是"能点中"与"看得见行数"的折中）*/
+body.is-mobile .kbw-root .kbw-table .kbw-trow,
+body.is-mobile .kbw-root .kbw-table .kbw-frow { height: 36px; }
+body.is-mobile .kbw-root .kbw-rowcheck { width: 20px; height: 20px; }
+body.is-mobile .kbw-root .kbw-tree-item { height: 36px; }
+/**
+ * ⑦ **触屏命中面积**（P6 段⑤，2026-09-28）：用 `padding + 负 margin` 把命中撑到 ≥36px，
+ * **视觉尺寸一个像素都不动**（负 margin 把它往外扩的那圈还回去，等于只把"可点区域"长出去）。
+ *
+ * 实测口径（这一档下逐个量过，判据在探针里，双边 ≥36 且 ≤ 视觉高+24）：
+ *   · 视图档 `.kbw-seg button` → P1 就写了 `min-height:40`（本文件上面那组）✓
+ *   · 筛选 / 工具条按钮 `.kbw-btn` → P1 的 `min-height: var(--kbw-touch)` = 44 ✓
+ *   · 树行 `.kbw-tree-item` → 36 ✓
+ *   · **「自动排列」`.kbw-chk` 是唯一漏在外面的**（桌面 63×20，本文件里原先没有它）→ 下面补齐
+ * ⚠️ 横向只撑 8px（不是 10）：排序条里与它相邻的是排序下拉，`gap` 是 9px ——
+ * 撑到 10px 就会盖住下拉按钮右侧那 1px（点下去变成勾选框）。
+ */
+body.is-mobile .kbw-root .kbw-chk {
+  /* 20 + 9×2 = 38（口径 ≥36，多两像素是给 getBoundingClientRect 的小数留余量） */
+  padding: 9px;
+  margin: -9px;
+}
+/**
+ * 树节点的**展开三角**（`.kbw-tree-caret`，桌面 14px 宽）。
+ * 触屏上这是展开文件夹**唯一**的入口（没有方向键、点行本身是选中）——
+ * 14×36 太窄，撑成 38×36（14 + 12×2）。代价：吃掉名字左侧约一个字宽的可点区
+ *（那一段点了是展开、不是选中）。
+ */
+body.is-mobile .kbw-root .kbw-tree-caret {
+  /**
+   * 🔴 **必须写 `box-sizing: content-box`**：本项目 `.kbw-root *` 是 `border-box`
+   *（`styles/base.css`），而这条控件有**显式的 `width: 14px`** —— border-box 下
+   * padding 会**从里面吃**：撑完还是 14px 宽、内容区被压成 0
+   *（真机实测：写完 padding 之后量到 16×24，跟没写一样）。
+   * 这一条对"用 padding 撑命中"的通用教训：**目标元素有显式宽高时，先把它改成 content-box**。
+   */
+  box-sizing: content-box;
+  /* 16（字形行盒）+ 10×2 = 36 高 ｜ 14 + 12×2 = 38 宽（口径 ≥36，都过）*/
+  padding: 10px 12px;
+  margin: -10px -12px;
+}
+/**
+ * 🔴 **触屏：目录栏 168** —— 从 P6 段⑥ ④-A 起这句话只说一遍。
+ *
+ * 原先这里写的是 `body.is-mobile .kbw-root .kbw-notes-side { width: 168px }`，
+ * 而顶栏那条灰带在 shell.css 里自己写 208 —— 用户的平板正是"容器 ≥900（`wide`）
+ * + `body.is-mobile`"，于是目录栏 168、灰带 208、错位 40px（P6b 独立审查 A🔴2 抓的真破绽）。
+ * 现在宽度只有一个真源 `--kbw-col-w`：**目录栏与顶栏列头槽读同一份**，
+ * 这类"两处各写一个数"的错从结构上就不可能再发生。
+ * ⚠️ 选择器要**压得住** `[data-w='mid']`（0,2,0）：这里是 (0,2,1) 且文件在 STYLE_ORDER 里更靠后 ✓。
+ */
+body.is-mobile .kbw-root { --kbw-col-w: 168px; }
+body.is-mobile .kbw-root .kbw-search { width: 140px; min-height: 36px; }
+body.is-mobile .kbw-root .kbw-qbtn { min-height: 44px; }
+body.is-mobile .kbw-root .kbw-gsearch { height: 52px; }
+body.is-mobile .kbw-root .kbw-undobar { max-width: calc(100vw - 24px); min-width: 0; width: 100%; }
+
+/* ⚠️ P7.7 收：原「触屏 ? 常显」那条随徽标退役一起删（触屏暂无提示路径，见 blocks/quick.ts 文件头记档） */

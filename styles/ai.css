@@ -1,0 +1,700 @@
+/* ══ AI 助手浮层（P6 段④ · P7.3b 重设计 · 交互规格 §11） ══ */
+/* 形态：头部一行（历史 / 标题 / 档位胶囊 / 新对话 / 导出 / ✕）· 中间可滚的对话区
+   · 底部输入区。**没有底栏**（关闭走 ✕ / Esc，导出在头部）。
+   图形语言（对齐 `AI面板重设计稿.html`）：只有对话是主角 —— 说明文字能删就删，
+   动作用图标与细线；agent 的干活过程 = 步骤行；要动库的 = 一张可勾选的待确认卡。
+   ⚠️ 对话区**自己滚**（`max-height` + `overflow:auto`），不把模态撑爆 ——
+   本项目的浮层反复栽在"内容长了就把别的东西挤出屏幕"上（小窗那次真的把正文编辑器挤没了）。
+   ⚠️ 折行类容器显式写 `white-space: normal`：`white-space` 是**继承**属性，
+   而工作台根元素在键盘模式下曾经带过 `nowrap`（P6③ 那条 🔴）。别赌祖先没写。 */
+
+/* ── 头部图标与标题的光学对齐（P7.9 · ⑦c）───────────────────────
+   3× 特写实测：历史图标看着比「经纬助手」标题**高 ~1.5px** ——
+   几何上 flex 居中没错（DOM 盒中线实测相等），是 CJK 大字的**字面重心偏下**。
+   修法 = 图标**故意下沉 1.5px** 补视觉；探针量"有向差在 [0.5, 2.5] 档"
+  （量不了字面重心，只能盯补偿还在不在 —— 细节见 probe.mjs 那步的注释）。
+   ⚠️ 补偿值是按当前 UI 字体定的经验值：换字体 / 换主题要重量重校。
+   ⚠️ 用 `position: relative; top:`（`transform` 在这里也生效，但 `.kbw-ico` 是
+   inline 元素时 transform 会被**静默忽略**——position 两种情形都稳）。 */
+.kbw-ai-histbtn .kbw-ico {
+  position: relative;
+  top: 1.5px;
+}
+
+/* ── 档位胶囊已退役（P7.12 · R4：整体撤掉，安全语义由确认流承担；
+      模型信息改挂「⋯」菜单顶行 + 按钮 tooltip）—— 样式随功能删除，别回流 ── */
+
+.kbw-ai-body {
+  position: relative; /* 历史抽屉 + 遮罩的定位基准 */
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 220px;
+}
+
+.kbw-ai-log {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2); /* R4（P7.12）：气泡间距收紧（原 sp-3） */
+  overflow: auto;
+  /* 与迁移面板同一个量级：够长但不至于把底部输入区挤出屏幕 */
+  max-height: 46vh;
+  padding-right: var(--sp-1);
+}
+
+/* ── 气泡：用户右 / 助手左（对齐重设计稿的状态②）──────────────── */
+.kbw-ai-bubble {
+  border-radius: var(--radius-m, 8px);
+  padding: var(--sp-3);
+  font-size: var(--fs-3);
+  line-height: var(--lh-2);
+  white-space: normal;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.kbw-ai-bubble.is-me {
+  align-self: flex-end;
+  max-width: 82%;
+  border-radius: var(--radius-m, 8px) var(--radius-m, 8px) 3px var(--radius-m, 8px);
+  /* 用户那一侧用 accent 压满：一眼分得清谁说的（`--text-on-accent` 是平台配好的那一对） */
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: 1px solid transparent;
+}
+
+.kbw-ai-bubble.is-ai {
+  align-self: flex-start;
+  max-width: 92%;
+  border-radius: var(--radius-m, 8px) var(--radius-m, 8px) var(--radius-m, 8px) 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: var(--kbw-shadow-2);
+}
+
+.kbw-ai-bubble.is-ai.is-error {
+  border-color: var(--color-red, var(--background-modifier-border));
+}
+
+/**
+ * 助手那一侧**渲染 Markdown** —— `white-space` 显式写回 `normal`（继承属性，见文件头）。
+ * ⚠️ 里面的块级元素间距要自己定，否则平台默认的 `p` 边距会把气泡撑得很难看。
+ */
+.kbw-ai-reply {
+  white-space: normal;
+}
+.kbw-ai-reply > :first-child { margin-top: 0; }
+.kbw-ai-reply > :last-child { margin-bottom: 0; }
+.kbw-ai-reply p { margin: var(--sp-2) 0; }
+.kbw-ai-reply ul,
+.kbw-ai-reply ol { margin: var(--sp-2) 0; padding-left: 1.4em; }
+.kbw-ai-reply li { margin: 2px 0; }
+.kbw-ai-reply code {
+  font-family: var(--font-monospace);
+  font-size: var(--fs-2);
+  background: var(--recessed);
+  border-radius: var(--radius-s, 4px);
+  padding: 1px 4px;
+}
+.kbw-ai-reply pre {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-s, 4px);
+  background: var(--recessed);
+  overflow: auto;
+}
+.kbw-ai-reply pre code { background: none; padding: 0; }
+.kbw-ai-reply h1, .kbw-ai-reply h2, .kbw-ai-reply h3, .kbw-ai-reply h4 {
+  margin: var(--sp-3) 0 var(--sp-1);
+  font-size: var(--fs-4);
+}
+.kbw-ai-reply blockquote {
+  margin: var(--sp-2) 0;
+  padding-left: var(--sp-3);
+  border-left: 3px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.kbw-ai-detail {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  white-space: pre-wrap;
+}
+
+.kbw-ai-note {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+}
+.kbw-ai-note.is-error { color: var(--color-red, var(--text-faint)); }
+/*
+ * 用量脚注（P7.3c 17.10②）：比普通说明**再淡一档**、等宽 —— 它是一行账，
+ * 不该跟"已跳过""到上限了"这类要人读的说明抢注意力。
+ */
+.kbw-ai-usage { font-family: var(--font-monospace); opacity: 0.85; }
+/* R4（P7.12）：用量明细**默认收起** —— 一行「⋯ 用量明细」开关，点开才显示明细 */
+.kbw-ai-usage-fold {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.kbw-ai-usage-body { display: none; }
+.kbw-ai-usage-body.is-open { display: block; margin-top: 2px; }
+
+/* ── 流式正文（打字机/真流都画在这里，收尾换成正式的 Markdown 渲染）──── */
+.kbw-ai-stream {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ── 步骤行（agent 的干活过程）：读类淡、写类显，右侧状态 ──────── */
+.kbw-ai-steps { display: flex; flex-direction: column; gap: 2px; }
+.kbw-ai-step {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  white-space: normal;
+}
+.kbw-ai-step.is-w { color: var(--text-muted); }
+.kbw-ai-step-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-ai-step-st { flex: none; display: inline-flex; color: var(--text-faint); }
+.kbw-ai-step.is-ok .kbw-ai-step-st { color: var(--color-green, var(--text-muted)); }
+.kbw-ai-step.is-bad .kbw-ai-step-st { color: var(--color-red, var(--text-faint)); }
+.kbw-ai-step.is-danger .kbw-ai-step-ic { color: var(--color-red, var(--text-faint)); }
+/* 进行中：图标呼吸（reduced-motion 由 base.css / settings.css 那两段统一管；
+   1 次 1ms 后回落到静态图标 —— 进行中由旁边那行文案承载，信号不丢） */
+.kbw-ai-step.is-running .kbw-ai-step-ic { animation: kbw-ai-breathe var(--t-breathe) var(--ease-loop) infinite; }
+
+@keyframes kbw-ai-breathe {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+
+/* ── 待确认卡（agent 的写类动作停在这里等勾选）────────────────── */
+.kbw-ai-plan {
+  margin-top: var(--sp-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  overflow: hidden;
+}
+
+.kbw-ai-plan-head {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  padding: var(--sp-1) var(--sp-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.kbw-ai-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+  white-space: normal;
+}
+
+.kbw-ai-row:last-child {
+  border-bottom: none;
+}
+
+/* 勾掉的整行变淡 —— 但**不是** `display:none`：用户要能看见自己排除了哪几条 */
+.kbw-ai-row.is-off {
+  opacity: .45;
+}
+
+.kbw-ai-check {
+  flex: none;
+  /* 勾选框要看得见：用那一档 ≥3:1 的非文字色（真机量过，见 tokens.css） */
+  accent-color: var(--interactive-accent);
+  align-self: center;
+}
+
+.kbw-ai-name {
+  flex: 0 1 auto;
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.kbw-ai-path {
+  flex: 1 1 auto;
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kbw-ai-why {
+  flex: 0 0 auto;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 动作行（待确认卡的按钮）──────────────────────────────────── */
+.kbw-ai-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+/* ── `ask_user` 的轻弹层（P7.21 · #3）：虚线框 = "这不是要你拍板，是问你一句" ── */
+.kbw-ai-ask {
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.kbw-ai-ask-q {
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+  white-space: normal;
+}
+
+.kbw-ai-ask-input {
+  width: 100%;
+}
+
+.kbw-ai-ask-acts {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+
+/* ── 消息级操作：一排安静的小图标（常显 —— hover-only 在触屏上等于不存在）── */
+.kbw-ai-ops {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: var(--sp-2);
+}
+.kbw-ai-ops .kbw-btn {
+  color: var(--text-faint);
+  padding: var(--sp-1);
+  min-height: 0;
+  height: auto;
+}
+.kbw-ai-ops .kbw-btn svg { width: 13px; height: 13px; }
+
+/* ── 输入区（**粘在底部**，不随对话滚动）──────────────────────── */
+.kbw-ai-composer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: var(--sp-3);
+}
+
+.kbw-ai-composer-row {
+  display: flex;
+  /* P7.10 · #12 修整：**整行高度由输入框说了算** —— 居中对齐（原来 flex-end +
+     高 textarea 让整行显得偏高、placeholder 看着不在行中间） */
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.kbw-ai-input {
+  flex: 1 1 auto;
+  resize: vertical;
+  /* 一行文字 + 对称内边距（P7.10 · #12）：`rows=1`（见 ui/ai-panel.ts）+ 这里守住 */
+  min-height: 0;
+  max-height: 140px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: var(--fs-3);
+  line-height: var(--lh-2);
+  /* 显式写回来：`white-space` 是继承属性（见文件头） */
+  white-space: pre-wrap;
+}
+
+.kbw-ai-send {
+  flex: none;
+}
+
+/* ── `@` 引用选择器小面板 + 工作目录面板（P7.10 · #12）──────────────
+   两者都是 `.kbw-panel` 浮层：这里只管宽度与两栏布局；目录树本体是
+   `styles/components.css` 的 `.kbw-ftree`（三处共用那一份）。 */
+.kbw-ai-refpanel {
+  width: min(560px, 92vw);
+}
+.kbw-ai-refsearch {
+  width: 100%;
+  margin-bottom: var(--sp-2);
+}
+.kbw-ai-refcols {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: stretch;
+}
+.kbw-ai-reftree {
+  flex: 0 0 190px;
+  min-width: 0;
+}
+.kbw-ai-reftree .kbw-ftree {
+  max-height: 300px;
+}
+.kbw-ai-reflist {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--surface-2);
+  padding: var(--sp-1);
+}
+.kbw-ai-refitem {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 5px var(--sp-2);
+  border-radius: var(--radius-s, 6px);
+  cursor: pointer;
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+}
+.kbw-ai-refitem-t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-ai-refitem-ico {
+  flex: none;
+  color: var(--text-faint);
+}
+.kbw-ai-refitem.is-folder {
+  color: var(--text-muted);
+}
+.kbw-ai-refempty {
+  padding: var(--sp-3) var(--sp-2);
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  white-space: normal;
+}
+.kbw-ai-dirpanel {
+  width: min(360px, 92vw);
+}
+.kbw-ai-dirhint {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  line-height: var(--lh-2);
+  margin-bottom: var(--sp-2);
+  white-space: normal;
+}
+
+/* 发送键在等待时原地变「停止」（不是错误态，安静一点） */
+.kbw-ai-send .kbw-btn.is-stop {
+  background: transparent;
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+}
+
+/* ── 触屏：按钮与输入框到 36px 以上（§5.8 的命中口径，与 P6⑤ 那条同源）── */
+body.is-mobile .kbw-ai-acts .kbw-btn,
+body.is-mobile .kbw-ai-send .kbw-btn,
+body.is-mobile .kbw-ai-ops .kbw-btn {
+  min-height: 36px;
+}
+
+/**
+ * **开场引导**（P7.0a 批 1⑩；P7.3b 改短）：一句话 + 2–3 个示例问法
+ * （点了填进输入框、不自动发）。底子沿用 `.kbw-ai-bubble.is-ai`。
+ * 示例做成安静的可点行（不再是三枚大按钮）。
+ */
+.kbw-ai-intro { display: flex; flex-direction: column; gap: var(--sp-2); }
+.kbw-ai-intro-lead { display: flex; gap: var(--sp-2); align-items: baseline; color: var(--text-muted); }
+.kbw-ai-intro-lead .kbw-ai-intro-ico { color: var(--interactive-accent); translate: 0 2px; }
+.kbw-ai-intro-ex {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.kbw-ai-ex {
+  /* 问句长短不一：文字左对齐、按钮跟着内容宽，且**允许多行** */
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  text-align: left;
+  white-space: normal;
+  height: auto;
+  min-height: 0;
+  line-height: var(--lh-2);
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  padding: var(--sp-1) var(--sp-2);
+}
+.kbw-ai-ex .kbw-ai-ex-ico { color: var(--text-faint); flex: none; }
+@media (hover: hover) {
+  .kbw-ai-ex:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+}
+
+/* ── 恢复出来的上一段对话（静态重画，**不用活轮次那些类名**）──
+   视觉上与实时消息同一种长相（只是不带操作按钮）：Q 像用户气泡、A 像助手气泡，
+   动作摘要一行行淡淡地跟在后面，「上次的对话」做成分隔线。 */
+.kbw-ai-hist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.kbw-ai-hist-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  color: var(--text-faint);
+  font-size: var(--fs-1);
+  letter-spacing: .05em;
+  margin: var(--sp-1) 0;
+}
+.kbw-ai-hist-head::before,
+.kbw-ai-hist-head::after {
+  content: "";
+  height: 1px;
+  background: var(--background-modifier-border);
+  flex: 1;
+}
+.kbw-ai-hist-q {
+  align-self: flex-end;
+  max-width: 82%;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: var(--radius-m, 8px) var(--radius-m, 8px) 3px var(--radius-m, 8px);
+  padding: var(--sp-3);
+  font-size: var(--fs-3);
+  line-height: var(--lh-2);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.kbw-ai-hist-a {
+  align-self: flex-start;
+  max-width: 92%;
+  background: var(--surface-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px) var(--radius-m, 8px) var(--radius-m, 8px) 3px;
+  padding: var(--sp-3);
+  font-size: var(--fs-3);
+  line-height: var(--lh-2);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  opacity: .92;
+}
+.kbw-ai-hist-a > :first-child { margin-top: 0; }
+.kbw-ai-hist-a > :last-child { margin-bottom: 0; }
+.kbw-ai-hist-row {
+  align-self: flex-start;
+  color: var(--text-faint);
+  font-size: var(--fs-2);
+  padding-left: var(--sp-2);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* ── 历史对话抽屉（左上角图标；盖在对话区上，点空白处收起）──────── */
+.kbw-ai-scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--background-primary) 55%, transparent);
+}
+.kbw-ai-drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 232px;
+  background: var(--background-secondary);
+  border-right: 1px solid var(--background-modifier-border);
+  display: flex;
+  flex-direction: column;
+  animation: kbw-ai-drawer-in var(--t-fast) var(--ease-enter);
+}
+@keyframes kbw-ai-drawer-in {
+  from { transform: translateX(-12px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.kbw-ai-drawer-head {
+  font-size: var(--fs-1);
+  letter-spacing: .06em;
+  color: var(--text-faint);
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+}
+/* 抽屉顶部的「＋ 新建对话」（P7.9 · ⑦b）：全宽 + 主题色描边（醒目但不抢列表） */
+.kbw-ai-drawer-new {
+  flex: none;
+  margin: 0 var(--sp-2) var(--sp-2);
+  width: calc(100% - var(--sp-4));
+  justify-content: center;
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+.kbw-ai-drawer-list {
+  flex: 1;
+  overflow: auto;
+  padding: 0 var(--sp-2) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.kbw-ai-drawer-empty { color: var(--text-faint); font-size: var(--fs-2); padding: var(--sp-2) var(--sp-3); }
+/* 一行 = 容器 + 主按钮 + 两枚行内动作（P7.10 · #11 —— 见 `ui/ai-panel.ts` 抽屉渲染那段）。
+   ⚠️ `.kbw-ai-sess` 从"按钮"改成**容器**（is-active / hover 的口径不变，探针与用例照认）。 */
+.kbw-ai-sess {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: var(--radius-s, 6px);
+  min-height: 0;
+}
+.kbw-ai-sess-pick {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: stretch;
+  text-align: left;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: var(--radius-s, 6px);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--text-normal);
+  min-height: 0;
+  height: auto;
+  min-width: 0;
+}
+.kbw-ai-sess-t {
+  font-size: var(--fs-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kbw-ai-sess-m { font-size: var(--fs-1); color: var(--text-faint); }
+.kbw-ai-sess.is-active { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent); }
+@media (hover: hover) {
+  .kbw-ai-sess:hover { background: var(--background-modifier-hover); }
+}
+/* 行内动作（导出 / 删除）：**默认隐藏**，鼠标落到该行才出现（二拍④；focus-within 同现 —— 键盘可用）。
+   ⚠️ `pointer-events: none` 挡住"看不见却点得到"；tap 慢一点也先经 focus… 触屏由 focus-within 兜底。 */
+.kbw-ai-sess-acts {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: var(--sp-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-base) var(--ease);
+}
+@media (hover: hover) {
+  .kbw-ai-sess:hover .kbw-ai-sess-acts {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.kbw-ai-sess:focus-within .kbw-ai-sess-acts {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── `@` 引用（输入框上方那排胶囊 + 用户气泡里的引用行）──────── */
+.kbw-ai-refrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+}
+.kbw-ai-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-2);
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-1);
+  max-width: 100%;
+}
+.kbw-ai-ref-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+/* 胶囊里的小图标（能力包那一枚；引用胶囊上没有图标） */
+.kbw-ai-ref-ico { flex: none; color: var(--text-muted); }
+/* 能力包胶囊（P7.3c）：与引用胶囊同排、但要一眼分得开 —— 淡底 + 一点点强调色 */
+.kbw-ai-skillchip {
+  border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+}
+.kbw-ai-skillchip .kbw-ai-ref-ico { color: var(--interactive-accent); }
+.kbw-ai-ref-x {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  padding: 0 var(--sp-1);
+  min-height: 0;
+  height: auto;
+  cursor: pointer;
+}
+/* ⚠️ 顶层 :hover 必须包进 @media (hover: hover)（platform-pitfalls #36：触屏点完会留悬停态） */
+@media (hover: hover) {
+  .kbw-ai-ref-x:hover { color: var(--text-normal); }
+}
+.kbw-ai-refs-note {
+  color: var(--text-muted);
+  font-size: var(--fs-1);
+  margin-top: var(--sp-1);
+}
+
+/* ── 参数槽小表单（P7.21b：#5 能力包扩展）────────────────────────────
+   挂在 `openFloating` 上（与引用/工作目录选择器同一形状）；
+   一行 = 「槽名 + 输入框」，槽名是正文里 `{{名字}}` 的那个名字。 */
+.kbw-ai-param-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.kbw-ai-param-label {
+  flex: none;
+  min-width: 4.5em;
+  color: var(--text-muted);
+  font-size: var(--fs-1);
+}
+.kbw-ai-param-input { flex: 1 1 auto; min-width: 0; }

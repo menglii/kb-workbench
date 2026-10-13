@@ -1,0 +1,76 @@
+/* ══════════════════════════════════════════════════════════════════
+   P6：图谱（交互规格 §5；视觉照 `界面设计.html` 的 `s-graph`）
+   ══════════════════════════════════════════════════════════════════
+
+   🔴 **作用域只能挂我们自己的类**（`.kbw-graph-stage`），**绝不能按 `[data-type="graph"]` 写**
+   —— 图谱 leaf 的 `data-type` 就是 `"graph"`（排查报告 #53 证过），
+   按它写会连**用户手动打开的官方图谱标签**一起打到：那边也会被藏掉 `.view-header`、
+   也会被塞成满幅。这正是这一轮"作用域别按平台属性写"那条红线的现场。 */
+
+.kbw-graph { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+/* 画布宿主：满幅。**给一个最小高度** —— 否则窄档 / 高度为 0 的布局下
+   会留一整片白屏，而"白屏"和"图谱在加载"看起来一模一样（§5 的边界那一条） */
+.kbw-graph-stage {
+  flex: 1; min-height: 240px; min-width: 0;
+  display: flex; flex-direction: column;
+  position: relative;
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+/* 平台给的内层容器（`.workspace-leaf-content` 那一档）：它自带 padding 与边框，
+   我们要的是**贴边满幅**（视觉稿就是"满幅画布"） */
+.kbw-graph-stage .workspace-leaf-content {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  border: none; padding: 0; background: transparent;
+}
+
+/* 🔴 藏掉自带的导航条：前进/后退/标题/更多/关闭。
+   **真机取证（P6 spike，2026-09-27 实拍）**：`.view-header` 里**只有这些导航控件**，
+   图谱自己的过滤/颜色组/外观/力度面板**不在里面**（它们在 `.view-content` 下的
+   `.graph-controls`，位于**右上角**）。
+   ⚠️ 这条要写对：S1 当时记的是"图谱的过滤滑杆住在 `.view-header` 里"——
+   实测**不成立**。藏 header 是纯赚（工作台里那排按钮本来就是死路：
+   不占标签页、也没有"上一个文件"可回退）。 */
+.kbw-graph-stage .view-header { display: none; }
+
+.kbw-graph-stage .view-content { flex: 1; min-height: 0; padding: 0; }
+
+/* 图谱面板的位置由平台自己算（绝对定位在那个 content 里），我们不动它。
+   ⚠️ 但它在**右上角**（实测 `left: 844px`），而视觉稿 `s-graph` 画的是左上角 ——
+   以实机为准（§5 那一行原话是"同官方"），文档已回改。 */
+
+/* 🔴 **藏掉图谱自己那栏「筛选」**（`.graph-control-section.mod-filter`）。两个理由缺一不可：
+
+   ① **同一件事不能两个入口**（本项目的老规矩）：过滤**由工作台挂载时注入**，
+      再留一个能改的输入框，用户在那儿打的字会**当场顶掉**我们的排除规则
+      （`setQuery` 收到的就是那一个字符串，新的把旧的盖掉）。
+
+   ② 更要命的是**它会写盘**：那个输入框走的 UI 路径是
+      `updateSearch()` = `setQuery(...)` + **`onOptionsChange()`** —— 后者**把 `search`
+      写进 `.obsidian/graph.json`**。一旦落盘，用户**以后手动打开官方图谱标签**看到的
+      就是被过滤过的视图 —— 正好推翻用户 2026-09-27 拍板的
+      "程序化注入、不落盘、不影响官方图谱"。
+
+   其余三栏（**颜色组 / 外观 / 力度**）不碰过滤，**留着** —— 它们本来就该由用户自己调。
+   ⚠️ 作用域仍然只挂我们自己的类（`.kbw-graph-stage`），不能按 `[data-type="graph"]` 写：
+   那会连用户手动打开的官方图谱一起打到（把人家那栏筛选也藏了）。 */
+.kbw-graph-stage .graph-control-section.mod-filter { display: none; }
+
+/* 过滤注入失败 / 挂载失败时的说明条（§5 的两条出口） */
+.kbw-graph-note {
+  flex: none;
+  padding: 7px var(--sp-3);
+  font-size: var(--fs-2); color: var(--text-muted);
+  border-top: 1px solid var(--background-modifier-border);
+}
+.kbw-graph-note:empty { display: none; }
+.kbw-graph-note.is-warn { color: var(--text-warning, var(--color-yellow)); }
+
+.kbw-graph .kbw-graph-actions {
+  display: flex; justify-content: center; gap: var(--sp-2);
+  margin-top: calc(-1 * var(--sp-2));
+  padding-bottom: var(--sp-3);
+}

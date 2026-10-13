@@ -1,0 +1,403 @@
+/* ══ 重排库结构面板（P5 · 交互规格 §6 / 决策 17） ══ */
+/* 两栏：左边**真树 + 每节点状态徽标**（新建 / 保留 / 搬入 N / 撞名 N），
+   右边「会发生什么」汇总。两栏各自滚，面板本身不把模态撑爆。
+   ⚠️ 语义不靠颜色：徽标本身写了「新建 / 保留 / 搬入 3 / 撞名 1」，颜色只是辅助
+   （方案设计 §5.5：反色文字在 --color-yellow 上的对比度还没验，所以一律**淡底 + 常规色文字**）。 */
+
+.kbw-rb {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-4);
+  min-height: 300px;
+}
+
+.kbw-rb-tree {
+  flex: 0 0 320px;
+  min-width: 240px;
+  overflow: auto;
+  max-height: 54vh;
+  padding-right: var(--sp-3);
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.kbw-rb-side {
+  flex: 1 1 auto;
+  min-width: 260px;
+  overflow: auto;
+  max-height: 54vh;
+}
+
+/* ── 左：树 ─────────────────────────────────────────────────── */
+.kbw-rb-treehead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-1) var(--sp-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: var(--sp-2);
+}
+
+.kbw-rb-treetitle {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+}
+
+.kbw-rb-treeroot {
+  font-size: var(--fs-3);
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.kbw-rb-count {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 预设（R7 起叫「标准」）：样式见下面 `.kbw-rb-preset`（行内排，不再靠右） */
+
+/* ── 「这次怎么算」带（P7.11 · #14：输入在结果上面）────────────── */
+.kbw-rb-plan {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: 0 8px 8px 0;
+}
+.kbw-rb-planhead { font-size: var(--fs-2); font-weight: 600; color: var(--text-muted); padding-bottom: 2px; }
+.kbw-rb-act { padding: 5px 0; }
+.kbw-rb-actrow { display: flex; align-items: center; gap: var(--sp-2); }
+.kbw-rb-actname { font-size: var(--fs-3); color: var(--text-normal); }
+.kbw-rb-acthint { font-size: var(--fs-1); color: var(--text-faint); line-height: 1.6; margin-top: 2px; }
+
+.kbw-rb-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 3px var(--sp-1);
+  padding-left: calc(var(--sp-2) + (var(--kbw-depth) - 1) * 14px);
+  border-radius: 6px;
+  font-size: var(--fs-3);
+  color: var(--text-normal);
+}
+
+/* 缩进引导线（决策 17 的"真树"）：挂在节点行上，深度越深越往右 */
+.kbw-rb-node::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--sp-2) + (var(--kbw-depth) - 1) * 14px - 8px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--background-modifier-border);
+}
+
+/* ⚠️ 顶层 `:hover` 必须**就地**包进 `@media (hover: hover)`（platform-pitfalls #36）：
+   触屏上"点完还留着悬停态"很难看；`styles.css` 里有一条静态判据专门数这个条数 */
+@media (hover: hover) {
+  .kbw-rb-node:hover {
+    background: var(--background-modifier-hover);
+  }
+}
+
+.kbw-rb-node.is-new .kbw-rb-name {
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.kbw-rb-node.is-extra .kbw-rb-name {
+  color: var(--text-muted);
+}
+
+.kbw-rb-twisty {
+  flex: none;
+  width: 12px;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+}
+
+.kbw-rb-twisty.is-leaf {
+  color: transparent;
+}
+
+.kbw-rb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kbw-rb-kids.is-collapsed {
+  display: none;
+}
+
+/* ⚠️ 收起**只有这一条规则**：`nodeRow` 把 `is-collapsed` 贴在 `.kbw-rb-kids` 自己身上。
+   别再写一份"贴在外层 wrap 上"的选择器 —— 两份判定必漂（P5 收尾实测：类贴错了元素、
+   箭头变了子节点不动，而离线与真机都不报错）。 */
+
+/* 搬进这个目录的笔记：贴着节点列出（比"徽标上一个数"更能让人一眼看明白要动什么） */
+.kbw-rb-leaf {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 1px var(--sp-1);
+  padding-left: calc(var(--sp-2) + (var(--kbw-depth) - 1) * 14px + 12px);
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+}
+
+.kbw-rb-leafname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kbw-rb-leafwhy {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 徽标（面板作用域内的 chip 修饰；别在 components.css 里做全局语义色）── */
+.kbw-rb .kbw-chip {
+  padding: 1px 6px;
+  flex: none;
+}
+
+.kbw-rb .kbw-chip.is-new {
+  color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.kbw-rb .kbw-chip.is-kept {
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.kbw-rb .kbw-chip.is-in {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+  font-weight: 600;
+}
+
+.kbw-rb .kbw-chip.is-blocked {
+  color: var(--text-error, var(--color-red));
+  background: var(--background-modifier-hover);
+  font-weight: 600;
+}
+
+/* ── 右：三块式（R7 · 照 §R7 稿）──────────────────────────────── */
+/* ②③ 的块壳（① 仍用 .kbw-rb-plan 的左边 accent 条） */
+.kbw-rb-block {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+}
+.kbw-rb-blockhead { font-size: var(--fs-2); font-weight: 600; color: var(--text-muted); padding-bottom: 4px; }
+
+/* ① 的横排：范围 / 标准 / 看示意 …… 重新检查 */
+.kbw-rb-band { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.kbw-rb-pick { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-3); color: var(--text-normal); }
+.kbw-rb-pickname { color: var(--text-muted); font-size: var(--fs-2); }
+.kbw-rb-preset, .kbw-rb-range { max-width: 180px; font-size: var(--fs-2); }
+.kbw-rb-skelpick {
+  font-size: var(--fs-1);
+  color: var(--interactive-accent);
+  cursor: pointer;
+  user-select: none;
+}
+.kbw-rb-skelpick.is-on { color: var(--text-muted); }
+
+/* ① 的目录结构示意（点标准 / 点「看示意」展开；只读、示意） */
+.kbw-rb-skel {
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--background-modifier-border);
+  font-size: var(--fs-2);
+  line-height: 1.9;
+}
+.kbw-rb-skelhead { color: var(--text-muted); margin-bottom: 2px; }
+.kbw-rb-skelname { font-weight: 600; }
+.kbw-rb-skelhint { color: var(--text-faint); font-size: var(--fs-1); }
+.kbw-rb-skelrow {
+  padding-left: calc((var(--kbw-depth, 1) - 1) * 16px + 2px);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-rb-skelrow::before { content: '▾ '; color: var(--text-faint); }
+.kbw-rb-skelseed { color: var(--interactive-accent); }
+
+/* ② 的总述一句（原"四个统计块"退役 —— R7 文案对表） */
+.kbw-rb-sumsent { font-size: var(--fs-3); color: var(--text-normal); margin-bottom: var(--sp-2); }
+.kbw-rb-sumsent b { font-weight: 600; }
+.kbw-rb-sumrest { color: var(--text-muted); }
+
+.kbw-rb-last {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  padding-bottom: var(--sp-2);
+}
+
+/* ② 的三组（会做 accent / 要你拿主意黄 / 不动的弱）——**可折叠**，组头带计数与小字 */
+.kbw-rb-grp {
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 3px solid var(--background-modifier-border);
+  border-radius: 0 8px 8px 0;
+}
+.kbw-rb-grp.is-do { border-left-color: var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 6%, transparent); }
+.kbw-rb-grp.is-warn { border-left-color: var(--color-yellow); background: color-mix(in srgb, var(--color-yellow) 8%, transparent); }
+.kbw-rb-grp.is-keep { border-left-color: var(--background-modifier-border); }
+.kbw-rb-grphead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-2);
+  font-weight: 600;
+  color: var(--text-muted);
+  padding-bottom: 2px;
+  cursor: pointer;
+}
+.kbw-rb-grp.is-do .kbw-rb-grphead { color: var(--interactive-accent); }
+.kbw-rb-grphint { font-weight: 400; font-size: var(--fs-1); color: var(--text-faint); }
+.kbw-rb-grparrow { margin-left: auto; flex: none; color: var(--text-faint); }
+.kbw-rb-grpbody { display: none; padding-top: 2px; }
+.kbw-rb-grp.is-open .kbw-rb-grpbody { display: block; }
+
+/* ③ 的单选（常规纠偏 ◉ / 归拢重整 ○）与勾选（顺手补建） */
+.kbw-rb-radio {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+}
+.kbw-rb-radio.is-disabled { color: var(--text-faint); cursor: default; }
+.kbw-rb-radio-dot { color: var(--interactive-accent); flex: none; }
+.kbw-rb-radio.is-disabled .kbw-rb-radio-dot { color: var(--text-faint); }
+.kbw-rb-radio.is-on .kbw-rb-radio-label { font-weight: 600; }
+.kbw-rb-radio-hint { color: var(--text-faint); font-size: var(--fs-1); }
+.kbw-rb-buildrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+}
+.kbw-rb-check { display: inline-flex; align-items: center; gap: 6px; color: var(--text-normal); cursor: pointer; }
+.kbw-rb-check.is-disabled { color: var(--text-faint); cursor: default; }
+.kbw-rb-footnote { margin-top: var(--sp-2); font-size: var(--fs-1); color: var(--text-faint); }
+
+/* ②「要你拿主意」每行那个「打开」出口 */
+.kbw-rb-rowopen { flex: none; margin-left: var(--sp-2); }
+
+/* 分组里的一行：文字在左、why 小字在**行尾**（长句降 why —— 悬停有全文） */
+.kbw-rb-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 2px 0;
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+}
+.kbw-rb-row.is-toggle { cursor: pointer; }
+.kbw-rb-rowtext { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbw-rb-why {
+  margin-left: auto;
+  flex: none;
+  max-width: 55%;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-rb-row.is-more { color: var(--text-faint); }
+.kbw-rb-keeper-arrow { max-width: none; }
+/* 「不变」组的名单：默认收起（点摘要行展开） */
+.kbw-rb-keep-list { display: none; padding: 2px 0 2px var(--sp-3); }
+.kbw-rb-keeper.is-open .kbw-rb-keep-list { display: block; }
+.kbw-rb-keepline {
+  padding: 1px 0;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kbw-rb-legend {
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--background-modifier-border);
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+}
+
+.kbw-rb-note {
+  margin-top: var(--sp-3);
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+}
+
+.kbw-rb-warn {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 2px solid var(--color-yellow);
+  background: var(--recessed);
+  border-radius: 0 6px 6px 0;
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+}
+
+.kbw-rb-empty {
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+  font-size: var(--fs-3);
+  color: var(--text-muted);
+}
+
+.kbw-rb-foot {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.kbw-rb-src {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  text-decoration: underline dotted;
+}
+
+/* 窄档：两栏改上下（工作台自己也会被挤窄，面板不能只会横排） */
+@media (max-width: 720px) {
+  .kbw-rb {
+    flex-direction: column;
+  }
+
+  .kbw-rb-tree {
+    flex: none;
+    max-height: 34vh;
+    padding-right: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--background-modifier-border);
+    padding-bottom: var(--sp-2);
+  }
+
+  .kbw-rb-side {
+    max-height: 34vh;
+  }
+}

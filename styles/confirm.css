@@ -1,0 +1,142 @@
+/* ══════════════════════════════════════════════════════════════════
+   confirm · 统一确认流（交互规格 §9）
+   文案规则：标题说清数量+动作 · 主按钮重复数量 · 被跳过的要说出来
+   ══════════════════════════════════════════════════════════════════ */
+.kbw-confirm-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: var(--sp-2) 0 var(--sp-3);
+}
+.kbw-plan-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 7px 10px;
+  border-radius: var(--radius-s, 4px);
+  background: var(--recessed);
+  font-size: var(--fs-3);
+}
+.kbw-plan-row .kbw-plan-path {
+  font-family: var(--font-monospace);
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-plan-row .kbw-plan-arrow { color: var(--text-faint); flex: none; }
+.kbw-plan-row .kbw-plan-count {
+  margin-left: auto;
+  flex: none;
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-variant-numeric: tabular-nums;
+}
+.kbw-plan-row .kbw-plan-kind {
+  flex: none;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--background-modifier-hover);
+}
+/* 「AI 预整理」行尾徽标（P7.12 · #9/#11）：确认单上明写 AI 每篇动了什么；
+   warn = 改声明（覆盖旧值）—— 用 `.kbw-btn.is-danger` 同款"淡底 + 自适应字色"（不裸红） */
+.kbw-plan-row .kbw-plan-chip {
+  flex: none;
+  font-size: var(--fs-1);
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--background-modifier-hover);
+  white-space: nowrap;
+}
+.kbw-plan-row .kbw-plan-chip.is-warn {
+  background: color-mix(in srgb, var(--color-red) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-red) 30%, transparent);
+  color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal));
+}
+.kbw-plan-row.is-more { background: transparent; color: var(--text-faint); font-size: var(--fs-2); padding-left: 10px; }
+
+/* 警告与说明：色条 + 常规色文字（不靠颜色单独传达） */
+.kbw-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0 var(--sp-2) var(--sp-3);
+  border-left: 3px solid var(--text-faint);
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  line-height: var(--lh-3);
+  margin-bottom: var(--sp-2);
+}
+.kbw-msg.is-warn { border-left-color: var(--color-yellow); }
+.kbw-msg.is-info { border-left-color: var(--color-blue); }
+.kbw-msg.is-danger { border-left-color: var(--color-red); }
+.kbw-msg-list { margin: 0; padding-left: 16px; }
+.kbw-msg-list li { margin: 1px 0; }
+
+.kbw-confirm-snapshot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  margin-top: var(--sp-2);
+}
+/* 相机图标染 accent（照稿 s-confirm 的 snap-strip：svg 用主题色点住"快照承诺"这条） */
+.kbw-confirm-snap-ic { color: var(--interactive-accent); display: inline-flex; }
+
+.kbw-danger-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-2);
+  color: var(--color-red);
+  margin-bottom: var(--sp-2);
+}
+
+/* 危险态：主按钮**加深成实心红**（P7.7c 起常态是淡底红字，`.kbw-btn.is-danger`）
+   + 文案变「再点一次确认」（两下确认） */
+.kbw-btn.is-armed { animation: kbw-arm var(--t-base) var(--ease-enter); }
+@keyframes kbw-arm { from { transform: scale(.97); } to { transform: none; } }
+
+/* ── 「美化笔记」的对比框（P7.12 · R8）─────────────────────────────
+   确认流里唯一的自定义内容块（`spec.attach`）——只读展示物：+ 行淡绿、− 行淡红、
+   同文常态。语义色用"× 文本色"的自适应混合（与 `components.css` 的淡底红字同一手法）：
+   亮/暗主题里都够对比度，又不抢确认行与按钮的焦点。 */
+.kbw-diff {
+  margin-top: var(--sp-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.kbw-diff-head {
+  padding: 4px 10px;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.kbw-diff-body { max-height: 260px; overflow: auto; padding: 6px 0; font-size: var(--fs-2); }
+.kbw-diff-line { display: flex; gap: 6px; padding: 0 10px; line-height: 1.6; }
+.kbw-diff-mark {
+  flex: none;
+  width: 10px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.kbw-diff-text { white-space: pre-wrap; word-break: break-word; min-width: 0; }
+.kbw-diff-line.is-add { background: color-mix(in srgb, var(--color-green, #2e7d32) 12%, transparent); }
+.kbw-diff-line.is-add .kbw-diff-mark {
+  color: color-mix(in srgb, var(--color-green, #2e7d32) 80%, var(--text-normal));
+}
+.kbw-diff-line.is-del { background: color-mix(in srgb, var(--color-red) 10%, transparent); }
+.kbw-diff-line.is-del .kbw-diff-mark {
+  color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal));
+}
+.kbw-diff-line.is-del .kbw-diff-text { color: var(--text-muted); }

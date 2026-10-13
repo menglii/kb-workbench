@@ -1,0 +1,51 @@
+/* ══════════════════════════════════════════════════════════════════
+   empty · 空态四套 + 骨架屏（决策 26）
+   每种空态给**一个动作**，图形复用「经纬」笔画语言
+   ══════════════════════════════════════════════════════════════════ */
+.kbw-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-8) var(--sp-4);
+  text-align: center;
+  color: var(--text-faint);
+}
+.kbw-empty-mark { color: var(--text-faint); opacity: .5; margin-bottom: var(--sp-1); }
+.kbw-empty-title { font-size: var(--fs-4); color: var(--text-normal); line-height: var(--lh-2); }
+.kbw-empty-desc { font-size: var(--fs-2); color: var(--text-faint); max-width: 42ch; }
+.kbw-empty-act { margin-top: var(--sp-3); }
+
+/* 紧凑版：嵌在小容器里（面板、板块）时用 */
+.kbw-empty.is-compact { padding: var(--sp-6) var(--sp-3); }
+.kbw-empty.is-compact .kbw-empty-mark { width: 26px; height: 26px; }
+.kbw-empty.is-compact .kbw-empty-title { font-size: var(--fs-3); }
+
+/* ── 骨架屏：不空白也不转圈 ───────────────────────────────────── */
+@keyframes kbw-shimmer {
+  0% { opacity: .35; }
+  50% { opacity: .7; }
+  100% { opacity: .35; }
+}
+.kbw-skel { display: flex; flex-direction: column; gap: var(--sp-2); padding-top: var(--sp-2); }
+.kbw-skel-bar,
+.kbw-skel-card {
+  background: var(--background-modifier-hover);
+  /* 循环呼吸（reduced-motion 压成 1 次 1ms 后回基态 → 静态占位条，形状仍在） */
+  animation: kbw-shimmer var(--t-shimmer) var(--ease-loop) infinite;
+}
+.kbw-skel-bar { height: 10px; border-radius: 5px; }
+.kbw-skel-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 32px;
+}
+.kbw-skel-row .kbw-skel-bar:nth-child(1) { flex: 0 0 38%; }
+.kbw-skel-row .kbw-skel-bar:nth-child(2) { flex: 0 0 18%; }
+.kbw-skel-row .kbw-skel-bar:nth-child(3) { flex: 0 0 12%; }
+.kbw-skel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--sp-3); }
+.kbw-skel-card { height: 96px; border-radius: var(--radius-m, 8px); }
+.kbw-skel-head { height: 16px; width: 34%; border-radius: 8px; margin-bottom: var(--sp-3); }

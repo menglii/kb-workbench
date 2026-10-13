@@ -1,0 +1,398 @@
+/* ══ 首次使用向导（P6 段④ · 交互规格 §14） ══ */
+/* 三步一条横条 + 内容区。刻意**轻**：不做插画、不做分页动画 ——
+   它只在"从未配置过"时出现一次，做重了反而像在推销。
+
+   ⚠️ 折行容器显式 `white-space: normal` / `overflow-wrap`：`white-space` 是继承属性，
+   工作台根元素历史上带过 `nowrap`（P6③ 那条 🔴），别赌祖先。 */
+
+.kbw-wiz-steps {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.kbw-wiz-step {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--recessed);
+  white-space: nowrap;
+}
+
+/* 当前这一步：**加重 + 描边**，不只靠颜色（语义不靠颜色这一条本项目到处在用） */
+.kbw-wiz-step.is-on {
+  color: var(--text-normal);
+  font-weight: 600;
+  border-color: var(--interactive-accent);
+}
+
+.kbw-wiz-step.is-done {
+  color: var(--text-muted);
+}
+
+.kbw-wiz-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 220px;
+}
+
+.kbw-wiz-lead {
+  font-size: var(--fs-3);
+  color: var(--text-muted);
+  line-height: var(--lh-2);
+  white-space: normal;
+}
+
+/* ── 第 1 步：两个输入框 ─────────────────────────────────────── */
+.kbw-wiz-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.kbw-wiz-field-label {
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+/* ⚠️ `.kbw-wiz-field-note` 随字段注一起退役（P7.9 · ①）；`.kbw-wiz-hint` 还在用（校验提示） */
+.kbw-wiz-hint {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  white-space: normal;
+}
+
+.kbw-wiz-hint.is-warn {
+  color: var(--text-normal);
+}
+
+/* ── 第 2 步：两行开关 ───────────────────────────────────────── */
+.kbw-wiz-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  background: var(--surface-2);
+}
+
+.kbw-wiz-toggle.is-on {
+  border-color: var(--interactive-accent);
+}
+
+.kbw-wiz-toggle-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kbw-wiz-toggle-label {
+  font-size: var(--fs-3);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.kbw-wiz-toggle-desc {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  line-height: var(--lh-2);
+  white-space: normal;
+}
+
+/* ── 第 3 步「现场检测」的样式**整组随屏退役**（P7.9 · ①）——
+   原来这里有 .kbw-wiz-check / -row / -label / -value / .is-warn 与行内按钮那几条。
+   别再按旧类名加回来：屏本身没了（库里缺什么，首页「待处理」里都有）。 */
+
+/* ── 触屏：两步按钮到 36px 以上（与 §5.8 的命中口径同源）── */
+body.is-mobile .kbw-wiz-body .kbw-btn,
+body.is-mobile .kbw-wiz-toggle {
+  min-height: 36px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   P7.2b：五屏改版（引言 / 工作文件夹 / 结语 + 配图）
+   ────────────────────────────────────────────────────────────── */
+
+/* 配图：浅色截图统一 1px 边框；暗色下再压一点亮度（浅底不刺眼）。
+   ⚠️ `body.theme-dark` 是平台在 body 上打的明暗旗标（主题变量同一层）——
+   本项目其余样式全靠主题变量自适应，这是**唯一**一处需要显式判明暗的地方（图片不是变量）。 */
+.kbw-wiz-shot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+/* 加载失败：整块（图 + 说明行）藏掉 —— 缺图时文案与控件自己站得住，不摆破图 */
+.kbw-wiz-shot.is-missing {
+  display: none;
+}
+.kbw-wiz-img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--surface-2);
+}
+body.theme-dark .kbw-wiz-img {
+  filter: brightness(0.92);
+}
+.kbw-wiz-cap {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  white-space: normal;
+}
+
+/* ── 引言：两栏对照（原生 vs 经纬）───────────────────────────── */
+.kbw-wiz-intro {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--sp-3);
+  align-items: stretch;
+}
+.kbw-wiz-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--surface-2);
+}
+.kbw-wiz-col.is-good {
+  border-color: var(--interactive-accent);
+}
+.kbw-wiz-col-t {
+  font-size: var(--fs-3);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.kbw-wiz-col.is-good .kbw-wiz-col-t {
+  color: var(--interactive-accent);
+}
+.kbw-wiz-facts {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  line-height: var(--lh-2);
+  white-space: normal;
+}
+.kbw-wiz-arrow {
+  align-self: center;
+  color: var(--text-faint);
+  font-size: var(--fs-5);
+}
+
+/* ── 第 1 步：**三卡**横排（P7.12 · #8 重设计；P7.14 加「整个库」第三张）───── */
+/**
+ * 效果稿 = 演示稿 §W#8：**横排选择卡**（图标 + 标题 + 小字）；
+ * 选中 = accent 描边 + 淡底 + **右上角 ✓ 角标**（不靠颜色也能看出来）；
+ * **圆点已删**（`.kbw-wiz-radio` 整组退役）。留白全落 8px 网格。
+ * ⚠️ 列数 = **卡的份数**（P7.14 从 2 改 3）—— 加卡/删卡时这里一起改，别让它 2+1 换行。
+ */
+.kbw-wiz-q {
+  /* 「工作文件夹放在哪？」——一句问题，可选件照稿补上 */
+  color: var(--text-normal);
+}
+.kbw-wiz-optgrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+.kbw-wiz-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--surface-1);
+  cursor: pointer;
+  transition: border-color var(--t-base) var(--ease), background var(--t-base) var(--ease);
+}
+/* ⚠️ 顶层 :hover 必须包进 @media (hover: hover)：触屏点完会残留悬停态（静态红线钉着） */
+@media (hover: hover) {
+  .kbw-wiz-opt:hover {
+    border-color: var(--interactive-accent);
+  }
+}
+.kbw-wiz-opt:focus-visible {
+  border-color: var(--interactive-accent);
+}
+.kbw-wiz-opt.is-on {
+  border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+}
+.kbw-wiz-opt-ic {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+.kbw-wiz-opt.is-on .kbw-wiz-opt-ic {
+  color: var(--interactive-accent);
+}
+.kbw-wiz-opt-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.kbw-wiz-opt-t {
+  font-size: var(--fs-3);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.kbw-wiz-opt-s {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  white-space: normal;
+}
+/* ✓ 角标：右上角（只在选中时被画出来 —— 文本判据读 textContent，别常驻） */
+.kbw-wiz-ck {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  color: var(--interactive-accent);
+  font-weight: 700;
+  font-size: var(--fs-2);
+  line-height: 1;
+}
+/* 内容区：随选择淡入（答动作，--t-base） */
+.kbw-wiz-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: kbw-wiz-in var(--t-base) var(--ease-enter, ease-out);
+}
+@keyframes kbw-wiz-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* 树框：只留一层浅底 + 描边；选中节点从"方框"变**胶囊**（照 §W#8 稿） */
+.kbw-wiz-treebox {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--recessed);
+}
+.kbw-wiz-treebox .kbw-ftree-item.is-sel {
+  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  border-radius: 999px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+/* 字段：标签缩小上移（照稿）；输入框统一交给平台的焦点环 */
+.kbw-wiz-field .kbw-wiz-field-label {
+  font-size: var(--fs-2);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+body.theme-dark .kbw-wiz-treebox {
+  background: var(--surface-2);
+}
+
+/* ── 结语：三张去处卡 + 首页底纹 ────────────────────────────── */
+.kbw-wiz-cards {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  padding: var(--sp-5) var(--sp-3) var(--sp-3);
+}
+.kbw-wiz-cardbg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.14;
+  pointer-events: none;
+}
+.kbw-wiz-cardbg.is-missing {
+  display: none;
+}
+body.theme-dark .kbw-wiz-cardbg {
+  filter: brightness(0.9);
+}
+.kbw-wiz-cardrow {
+  position: relative;
+  /* P7.10 · #4：三张一排 → **2×2**（首页左上 / 全部笔记右上 / 看板左下 / AI 助手右下） */
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-2);
+}
+.kbw-wiz-card {
+  /* P7.10 · #4 二拍①：卡内**只有大字、居中**（小字说明退役） */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4) var(--sp-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-s, none);
+  cursor: pointer;
+  transition: border-color var(--t-base) var(--ease);
+}
+/* ⚠️ 顶层 :hover 必须包进 @media (hover: hover)：触屏点完会残留悬停态（静态红线钉着） */
+@media (hover: hover) {
+  .kbw-wiz-card:hover {
+    border-color: var(--interactive-accent);
+  }
+}
+.kbw-wiz-card:focus-visible {
+  border-color: var(--interactive-accent);
+}
+.kbw-wiz-card-t {
+  font-size: var(--fs-3);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+/* 「首页」卡：紫色强调（卡身描边 + 主文字）——口径见 P7.10 · #4 */
+.kbw-wiz-card.is-home {
+  border-color: var(--interactive-accent);
+}
+.kbw-wiz-card.is-home .kbw-wiz-card-t {
+  color: var(--interactive-accent);
+}
+/* （`.kbw-wiz-card-s` 随卡内小字一起退役 —— P7.10 · #4 二拍①） */
+
+/* （检测行与其「去建」按钮的样式已随屏退役 —— 见上面那段的说明） */
+
+/* ── 询问卡（P7.17 · 存量补齐主入口）──
+   勾开「笔记自动化」后滑出：与开关行同族（同样的描边/底色/圆角），
+   上边距把它与开关行拉开一点。文案在卡片自己身上。 */
+.kbw-wiz-ask {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  background: var(--surface-2);
+}
+.kbw-wiz-ask-t {
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+}
+.kbw-wiz-ask-btns {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}

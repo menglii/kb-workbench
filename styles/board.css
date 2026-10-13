@@ -1,0 +1,1227 @@
+/* ══════════════════════════════════════════════════════════════════
+   board · 看板（P4）：工具条 / 板块头 / 卡片 / 悬浮小窗 / 板块管理面板
+   ──────────────────────────────────────────────────────────────────
+   零硬编码色：全走 tokens.css 的别名与平台变量。
+   两条平台纪律（同 notes.css）：
+     · 顶层 `:hover` 一律包进 `@media (hover: hover)`（触屏点完不留悬停态）
+     · **不给容器加 `container-type`**（会让它成为 absolute/fixed 后代的包含块，
+       打中「浮层从触发点展开」）
+   ══════════════════════════════════════════════════════════════════ */
+
+.kbw-board { height: 100%; min-height: 0; }
+.kbw-board-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── 工具条 ─────────────────────────────────────────────────── */
+/* ⚠️ `position: relative` 不能省：顶上那条回执是 `position: absolute` 的，而它有**两个宿主**
+   （普通工具条 / 批量栏，c 期起批量栏那一支把回执挂在 toolbar 上）——
+   把定位上下文提到这一层，两条分支算出来的位置才一致。 */
+.kbw-board-toolbar { flex: none; position: relative; }
+.kbw-board-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--surface-0);
+  position: relative;
+}
+.kbw-board-tools { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.kbw-board-sp { flex: 1 1 auto; min-width: var(--sp-2); }
+.kbw-board-label { font-size: var(--fs-2); color: var(--text-faint); }
+/**
+ * 「改设置不关窗」的顶上一行回执（§4.1）
+ *
+ * ⚠️ **它必须待在工具条之内**（用户 2026-09-25 第二波反馈："窗口缩小时顶上那条紫色回执被裁掉一小截"）：
+ * 原先是 `top: -2px` + `translate(-50%, -100%)` —— 整条挂在工具条**上沿之外**，
+ * 于是它的可见性取决于"工具条上方还有没有空间"：窗口一矮/工具条一贴顶，那半截就落到可视区外被裁。
+ * 改成**在工具条里垂直居中**（回执比工具条矮，怎么缩都在框里）；水平仍落在中段那条弹性空隙上
+ *（`.kbw-board-sp` 把左右两组推开，中段本来就是空的）。
+ * `pointer-events: none`：它只是个提示，别去盖住底下的按钮。
+ */
+.kbw-board-receipt {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(60%, 380px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+  font-size: var(--fs-1);
+  box-shadow: var(--kbw-shadow-2);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── 板块区 ─────────────────────────────────────────────────── */
+.kbw-board-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-4) var(--sp-3) var(--sp-6);
+}
+.kbw-sect { margin-bottom: var(--sp-5); }
+.kbw-sect.is-sub { margin-left: var(--sp-5); border-left: 2px solid var(--background-modifier-border); padding-left: var(--sp-3); }
+/* 收起态：**卡片区留在 DOM 里、只藏起来**（P4.5 §1.2）。
+   这样"展开"是瞬时的（不重建 DOM、不重渲染正文），也才谈得上做动画。
+   注意别写成 `display: none` 挂在 `.kbw-cards` 自己身上 —— 那是"收起态"这一层的语义，
+   挂上去之后 JS 再也分不清"没建过"和"建好但藏着"。 */
+.kbw-sect.is-collapsed > .kbw-cards { display: none; }
+
+.kbw-sect-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: 8px;
+  min-height: 30px;
+}
+.kbw-sect-head.is-drop { background: var(--background-modifier-hover); outline: 1px dashed var(--interactive-accent); }
+.kbw-sect-caret {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.kbw-sect-nm { font-size: var(--fs-4); font-weight: 600; color: var(--text-normal); cursor: default; }
+.kbw-sect.is-sub .kbw-sect-nm { font-size: var(--fs-3); font-weight: 500; }
+.kbw-sect-n { font-size: var(--fs-1); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.kbw-sect-n.is-limited {
+  color: var(--text-warning);
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.kbw-sect-badge {
+  font-size: var(--fs-1);
+  color: var(--text-muted);
+  background: var(--background-modifier-hover);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-variant-numeric: tabular-nums;
+}
+.kbw-sect-badge.is-dim { opacity: .72; }
+
+/* ── 卡片网格 ───────────────────────────────────────────────── */
+.kbw-cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--kbw-gap, 12px);
+  padding: var(--sp-2) var(--sp-1) var(--sp-1);
+  border-radius: 10px;
+  min-height: 56px;
+}
+.kbw-cards.is-drop {
+  background: var(--background-modifier-hover);
+  outline: 1px dashed var(--interactive-accent);
+}
+
+/* 拖动源：**半透明占位**（P4.5 §1.1）。不 `display: none` ——
+   "我是从哪儿拿起来的"是拖动过程中最要紧的一条信息，位置不能凭空消失。 */
+.kbw-card.is-dragging { opacity: .35; }
+/* 插入位指示线：一根 2px 竖条，**插在卡片流里**（flex 项）→ 后面的卡片自然让位，
+   不用算任何坐标（算坐标那套要自己处理换行与滚动，列形态一上来就错）。 */
+.kbw-dropline {
+  flex: 0 0 auto;
+  width: 2px;
+  min-height: 56px;
+  align-self: stretch;
+  /* 负 margin 吃掉左右各半个 gap：否则 2px 的线会被两侧 gap 推成"两张卡中间空一块" */
+  margin: 0 calc(1px - var(--kbw-gap, 12px) / 2);
+  border-radius: 2px;
+  background: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-primary), var(--kbw-shadow-2);
+  animation: kbw-dropline-in var(--t-fast) var(--ease-enter);
+}
+@keyframes kbw-dropline-in {
+  from { opacity: 0; transform: scaleY(.7); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+/* 板块头的「N → M」预告：与目录树那份（§3.1）同一套文案，位置也固定在计数旁边 */
+.kbw-sect-preview {
+  font-size: var(--fs-1);
+  color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kbw-card {
+  width: var(--kbw-card-w, 240px);
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  box-shadow: var(--kbw-shadow-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-2);
+  cursor: default;
+  position: relative;
+}
+.kbw-card.is-hidden { opacity: .45; border-style: dashed; }
+.kbw-card.is-cursor { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+/**
+ * **多选**（c 期 §3.5）：选中的卡片 —— 底色 + 边框都换成 accent。
+ * 它和 `.is-cursor` 是**两件事**：光标是"键盘走到哪张"，选择是"批量操作会作用在哪些"，
+ * 所以两张不同的卡上可以各贴一个（叠在同一张上也不打架：一个走 outline、一个走底色+边框）。
+ *
+ * ⚠️ 底色写 `color-mix(… , var(--surface-2))` 而**不是** `…, transparent`：
+ * 卡片底本来就是不透明的 `--surface-2`，混 transparent 等于把卡底改成半透明、透出看板底色
+ *（浅色主题下会看见卡片"变脏"）。配比 16% 与「全部笔记」的行选中（`notes.css` 的
+ * `.kbw-trow.is-selected`）**刻意取同一个数** —— 两屏的"选中"看起来才是一回事。
+ */
+.kbw-card.is-selected {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--surface-2));
+  border-color: var(--interactive-accent);
+}
+/**
+ * **框选的选框**（c 期 §3.5）。挂在 `document.body` 上、`position: fixed`：
+ * 指针事件给的是**视口坐标**，把框挂进看板里的话滚一下就全歪（见 `startMarquee`）。
+ * `pointer-events: none` —— 它只是一层视觉，不能挡住底下正在进行的框选。
+ * z-index 3：压得住卡片，但低于菜单 / 悬浮小窗那些浮层（它们走 `--z-kbw-*` 那套变量）。
+ */
+.kbw-marquee {
+  position: fixed;
+  z-index: 3;
+  pointer-events: none;
+  border: 1px solid var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  border-radius: 2px;
+}
+/* 「编辑中」的源卡片（a.5-3）：悬浮小窗挂 body、position:fixed，滚看板时不跟着走 ——
+   靠这张卡上的**虚线**描边告诉用户"小窗编的就是它"（与光标的实线描边区分开） */
+/* 用 box-shadow 而不是 outline：后者会和光标的实线描边（也是 outline）互相顶掉，
+   同时选中 + 编辑中时只看得到一条。box-shadow 可以和 outline 叠加。 */
+.kbw-card.is-editing-source {
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--interactive-accent);
+}
+/**
+ * 卡片标题。⚠️ 长标题**不截成"…"**（用户 2026-09-25 反馈："长标题能不能左右滚动看全"）——
+ * 截断在窄卡上会把标题变成一串省略号，等于这篇叫什么看不见了。
+ * 改成**横向可滚**：鼠标 Shift+滚轮/触板横扫、触屏直接横扫都能看全；
+ * 触屏上"按住不动"仍旧是卡片拖动（长按 400ms 那条路），横扫才是滚动 —— 两者不打架。
+ */
+.kbw-card-t {
+  font-size: var(--fs-4);
+  font-weight: 600;
+  color: var(--text-normal);
+  /**
+   * 🔴 **标题不许被压缩**（用户 2026-09-25 截图："缩放后标题栏看不到了"）。
+   * 根因：它是卡片（`display: flex; flex-direction: column`）里的一个**可收缩** flex 项
+   *（默认 `flex-shrink: 1`），而 `overflow-y: hidden` 又让它成为滚动容器 →
+   * `min-height: auto` 按规范**退化成 0** → 卡片一矮（固定高度档、缩放锁高），
+   * 标题就被压成 **0 高**（真机量到 `title h=0 / scrollH=26`，整个标题看不见）。
+   * 修法：`flex: none` —— 标题永远占它那一行，要挤就挤正文（正文本来就能滚）。
+   */
+  flex: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  /**
+   * ⚠️ **滚动能力留着、滚动条藏起来**（用户 2026-09-25 第二波反馈：窗口缩小 → 每张卡顶上一条灰条）。
+   * 原因是 `scrollbar-width: thin` 那条：窄卡上几乎**每个**标题都溢出，于是那条**一直显示**、
+   * 正好压在这一行上 —— 浅色主题下看起来就是一条灰色圆角条，标题反而看不见了。
+   * 藏掉之后横扫（触屏）/ Shift+滚轮 / 触板两指照样能看全（能力没丢，只是不占位）。
+   * 📏 真机量过（2026-09-25 突变实验：把这条改回 `thin` 再量）：它吃掉的是 **10px**，
+   * 不是上面 `::-webkit-scrollbar` 写的 4px —— 那条 webkit 规则**管不住**真实高度
+   *（`scrollbar-width: thin` 的平台默认值说了算），所以别再照 4px 估算它有多碍事。
+   */
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.kbw-card-t::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.kbw-card-hr {
+  height: 1px;
+  background: var(--background-modifier-border);
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+
+/* 属性表格式（只属性 / 两者档）——**两列对齐**：
+   标签那一列按**最长的标签**取宽（grid 的 max-content），于是所有值都从同一条竖线开始。
+   早先是行内 flex + `min-width: 44px`，标签一长一短值就参差不齐（用户 2026-09-25 截图反馈）。 */
+.kbw-card-kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--sp-3);
+  row-gap: 3px;
+  margin-bottom: var(--sp-1);
+}
+.kbw-kv-k {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  /* 12.5px 的值与 11px 的标签基线差 ~1px —— 用 padding 顶一下，两列看起来才是同一条线 */
+  padding-top: 1px;
+}
+.kbw-kv-v {
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+  min-width: 0;
+  /* 值不截断（截断就白存了这个属性）——长值折行，网格列宽保证左边界仍然对齐 */
+  overflow-wrap: anywhere;
+}
+/**
+ * 「两者」档：属性块 / 正文块之间的**分隔条**（用户 2026-09-25 要的）。
+ * 拖它 → 属性块按 `--kbw-props-pct` 占高（两块各自可滚），松手落盘；双击恢复自动。
+ */
+.kbw-card-split {
+  flex: none;
+  height: 11px;
+  margin: 1px 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  border-radius: 5px;
+  /* 触屏：别让浏览器把"拖分隔条"当成滚动接管 */
+  touch-action: none;
+}
+.kbw-card-split-grip {
+  width: 30px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+  transition: background var(--t-fast) var(--ease), width var(--t-fast) var(--ease);
+}
+/* 拖到的那一块按比例占高；`.is-split` 才生效（没拖过 → 维持"按内容撑"的老样子）。
+   ⚠️ 选择器前面那截 `.kbw-cards` **不是装饰**：固定高度档有一条
+   `.kbw-cards.has-h .kbw-card-kv { flex: 0 0 auto }`（同权重 3 类）—— 不加这一截，
+   谁生效就全看两条规则谁写在后面（实测就栽在这：拖了分隔条、比例也落盘了，但高度纹丝不动）。 */
+.kbw-cards .kbw-card.is-split .kbw-card-kv {
+  flex: 0 0 var(--kbw-props-pct, auto);
+  min-height: 24px;
+  overflow-y: auto;
+}
+.kbw-cards .kbw-card.is-split .kbw-card-body {
+  /* 拖过分隔条的卡片：正文高度由比例说了算，同样不吃摘要行数那条上限 */
+  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+@media (hover: hover) {
+  .kbw-card-split:hover .kbw-card-split-grip { background: var(--interactive-accent); width: 44px; }
+}
+.kbw-card-split:focus-visible { outline: none; }
+.kbw-card-split:focus-visible .kbw-card-split-grip { background: var(--interactive-accent); width: 44px; }
+.kbw-kv-empty {
+  grid-column: 1 / -1;
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: var(--fs-2);
+}
+
+/* 语义色：色点 + 常规色文字（与 components.css 同一套） */
+.kbw-dot-txt { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.kbw-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--text-faint); }
+.kbw-dot-txt.c-blue .kbw-dot { background: var(--color-blue); }
+.kbw-dot-txt.c-cyan .kbw-dot { background: var(--color-cyan); }
+.kbw-dot-txt.c-yellow .kbw-dot { background: var(--color-yellow); }
+.kbw-dot-txt.c-orange .kbw-dot { background: var(--color-orange); }
+.kbw-dot-txt.c-green .kbw-dot { background: var(--color-green); }
+.kbw-dot-txt.c-purple .kbw-dot { background: var(--color-purple); }
+.kbw-dot-txt.c-red .kbw-dot { background: var(--color-red); }
+.kbw-dot-txt.c-faint .kbw-dot { background: var(--text-faint); }
+
+/**
+ * **固定高度的卡片**（`--kbw-card-h`，全局或板块级设的）：卡片等高，
+ * 正文**不再按行数截断**，而是填满剩下的高度、超出就在卡片里滚（悬停滚轮可用）。
+ * 这样"一屏能看多少字"由高度说了算，而不是永远卡在摘要行数上（用户 2026-09-25 要的）。
+ */
+.kbw-cards.has-h .kbw-card { height: var(--kbw-card-h); }
+.kbw-cards.has-h .kbw-card-body:not(.is-open) {
+  display: block;
+  /* 固定高度档的正文要**填满剩下的高度**（超出在卡里滚），不该再吃摘要行数那条高度上限 */
+  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  /**
+   * **底缘淡出**（P7.0a 批 1⑪）：固定高度是"头高 + 剩下都是正文"算出来的，
+   * **断点不落在行边界上** —— 最后一行常被从中间切断（真机截屏里"前 5 秒"戛然而止），
+   * 看着像渲染坏了而不是"下面还有"（`设计建议-P6第九段.md` ⑪）。
+   * 一条 24px 的渐隐给出"可滚"的视觉暗示（≈ 一行高）。
+   * ⚠️ 只挂**未展开**这一档：`.is-open`（展开）高度放开、没有裁切，不该再淡出。
+   * ⚠️ 内容没占满时底部是空白、看不出渐变；内容顶到最底说明约莫快满了，淡化无碍。
+   */
+  mask-image: linear-gradient(to top, transparent, black 24px);
+  -webkit-mask-image: linear-gradient(to top, transparent, black 24px);
+}
+.kbw-cards.has-h .kbw-card-kv { flex: 0 0 auto; }
+
+/**
+ * **关掉「预览换行」之后**（P6b ⑥）：回到"文本按原样、容器横向滚"。
+ * ⚠️ **只对文本生效** —— `white-space` 管不到表格/代码块的排布，它们本来就按内容宽度走
+ *（这正是用户要的"可以左右拖动的状态"：宽表格不被压扁）。
+ * 与 `.kbw-cw-preview.is-nowrap` 是同一套口径（两处一起改，别只改一边）。
+ */
+.kbw-card-body.is-nowrap {
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overflow-wrap: normal;
+}
+/* 正文摘要：3 行截断（行数由 --kbw-summary-lines 给），展开后就地长开 */
+.kbw-card-body {
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  color: var(--text-muted);
+  margin: var(--sp-1) 0 0;
+  overflow: hidden;
+  /**
+   * **默认折行**（P6b ⑥）：长 URL / 无空格的英文串不许把卡面撑破。
+   * ⚠️ 用 `overflow-wrap: anywhere`，**不用 `word-break`** —— 后者会把英文单词
+   * 从中间切开（读起来是"坏掉的排版"）。
+   */
+  overflow-wrap: anywhere;
+  /**
+   * 🔴 **显式写回 `normal`**（P6b 真机实测）：`white-space` 是**继承**属性，
+   * 而工作台根元素在键盘模式下被打上了 `white-space: nowrap`（见 `components.css`
+   * 里那条键帽规则的历史）—— 不写这一行的话，卡片摘要**永远不折行**，
+   * 而离线（桩里没有平台样式、也没有键盘模式）**全绿**。
+   * 与看板竖条那条 `white-space: normal` 是同一课的第二次。
+   */
+  white-space: normal;
+  overscroll-behavior: contain;
+}
+.kbw-card-body > :first-child { margin-top: 0; }
+.kbw-card-body > :last-child { margin-bottom: 0; }
+/**
+ * 🔴 **摘要裁切用 `block` + `max-height`，不许再用 `display: -webkit-box` + `-webkit-line-clamp`**
+ *（用户 2026-09-25 截图报的"卡片里文字叠在一起"）。
+ *
+ * `-webkit-box` 是 **legacy flexbox**：正文里的每个块级子元素都是它的 flex 项，
+ * 容器高度一被 clamp 限住，子元素就被**压扁**（不是裁切）→ 高 18 的元素里塞着 290px 的内容，
+ * 溢出的文字直接盖到后面的元素上。真机实测：每张卡片 3 处（`P:18<290`、`BLOCKQUOTE:54<91`、`OL:18<91`），
+ * 用 Range 量文本矩形是**每张卡 2–9 处真实重叠**；把这一条换成 `block` + `max-height` 后，
+ * 同一批卡片**压扁数归零**、且仍旧正确截到 3 行（2026-09-25 真机注入实验，Chromium 150）。
+ *
+ * 代价：**尾巴没有「…」省略号**（`max-height` 是按高度裁，不做省略号）。
+ * 卡片本来就有「展开 ∨」，不靠省略号提示"下面还有"。
+ * ⚠️ `--lh-2` 是**无单位的倍数**（1.45）→ 必须 `* 1em` 才凑得出长度值，
+ * 少了它整条 `calc()` 变无效值、max-height 静默失效（第一版实验就栽在这）。
+ * 各档的豁免（固定高度 / 比例 / 清单卡）另见下面三条 `max-height: none`。
+ */
+.kbw-card-body:not(.is-open) {
+  display: block;
+  max-height: calc(var(--lh-2) * var(--kbw-summary-lines, 3) * 1em);
+}
+.kbw-card-body.is-open { max-height: 46vh; overflow: auto; }
+.kbw-card-body h1, .kbw-card-body h2, .kbw-card-body h3 { font-size: var(--fs-3); margin: var(--sp-2) 0 var(--sp-1); }
+.kbw-card-body :is(ul, ol) { padding-inline-start: 1.2em; margin: var(--sp-1) 0; }
+.kbw-card-body code { background: var(--recessed); border-radius: 4px; padding: 0 3px; }
+.kbw-card-body input[type="checkbox"] { margin-inline-end: 4px; }
+/* 卡片内容**不许顶出卡片**（用户 2026-09-25 反馈"字可能会卡出去"）：
+   兜底三行 —— 长值（路径、URL、无空格长串）一律在卡内折行，宁可变高也不越界。
+   属性表那两列已经有 `minmax(0,1fr)` + `overflow-wrap: anywhere`，这里再压一道：
+   卡片/网格/正文都显式允许收缩，避免将来某个新面板忘了 min-width 就漏出去。 */
+.kbw-card { max-width: 100%; overflow-wrap: anywhere; }
+.kbw-card-kv { min-width: 0; max-width: 100%; }
+.kbw-card-kv > * { min-width: 0; }
+.kbw-card-body, .kbw-card-t { min-width: 0; }
+
+/* 🔴 任务行的勾选框**不许外挂**（a.5-4 的另一半，真机实测）：
+   平台的 `.task-list-item-checkbox` 自带 `margin-inline-start: -24px`（= checkbox-size 的 -1.5 倍），
+   那是给平台自己 2em 起步的列表缩进配的；而卡片正文的 ul 只有 1.2em ≈ 15px →
+   框左 348px、正文左 357px，被 `overflow: hidden` **切掉半个**（用户截图："左边没显示全"）。
+   清零这个负边距，让框落在列表内容框里。 */
+.kbw-card-body li.task-list-item > input[type="checkbox"] {
+  margin-inline-start: 0;
+}
+/* 任务/清单卡：摘要改由「条数」管（`applyListBudget` 给超额的 li 打 .kbw-li-over）——
+   行截断在这种情况下让位，否则第一条的嵌套子项就能吃满 3 行（25 条任务只见 1 条）。
+   ⚠️ 只在折叠态生效：展开还是看全文（就地切 class，不重画）。 */
+.kbw-card-body.is-list-body:not(.is-open) {
+  display: block;
+  /* 清单卡的"显示多少"由条数预算说了算 → 摘要行数那条高度上限对它让位 */
+  max-height: none;
+}
+.kbw-card-body:not(.is-open) li.kbw-li-over { display: none; }
+.kbw-card-empty { color: var(--text-faint); font-style: italic; }
+
+.kbw-card-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  align-self: flex-start;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-1);
+  color: var(--text-accent);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.kbw-card-more.is-open { color: var(--text-muted); }
+
+/**
+ * 卡片左上角那颗 **⋯**：**只在触屏选择模式出现**（段⑤ 收的欠账，§4.2「单篇设置」那一行：
+ * 「触屏：选择模式下点该项的 ⋯」—— 触屏没有右键，不然重命名 / 位置锁定 / 在新窗口打开
+ * 全都够不着）。
+ *
+ * 与网格档那颗 `.kbw-gmore`（`styles/notes.css`）**同一口径**：位置一样（左上角）、
+ * 都是"渲染时就在 DOM 里、靠 `.is-selectmode` 才显形"——不这么做就得在进出模式时重画整块看板，
+ * 而重画会丢掉每一列 / 每张卡面的滚动位置。
+ * ⚠️ 触屏档下它是 `--kbw-touch`（44px）：那条规则在 `styles/mobile.css` 的 `.kbw-iconbtn` 上，
+ * 比这两条**更具体**，所以触屏命中比桌面大一圈（这是想要的，它是那一档的入口）。
+ */
+.kbw-card .kbw-card-morebtn {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-base) var(--ease);
+}
+.kbw-card.is-selectmode .kbw-card-morebtn { opacity: 1; pointer-events: auto; }
+
+.kbw-card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: auto;
+  padding-top: var(--sp-2);
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+}
+.kbw-card-meta-x { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbw-card-warn { color: var(--text-warning); margin-left: auto; flex: none; }
+
+.kbw-sect-empty {
+  padding: var(--sp-5) var(--sp-3);
+  color: var(--text-faint);
+  text-align: center;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 10px;
+  width: 100%;
+}
+.kbw-sect-empty-t { font-size: var(--fs-3); }
+.kbw-sect-empty-s { font-size: var(--fs-2); margin-top: var(--sp-1); }
+
+/* ── 悬浮小窗（快速编辑面）─────────────────────────────────── */
+/**
+ * **这一窗文字的整体缩放**（f 期第 2 条）：`--kbw-cw-scale` 由 `panel-ui.ts` 的
+ * `applyPanelFont()` 写在**页**上（正文本体另走 `--font-text-size`，真机实测那条才管正文）。
+ * 下面凡是用 `--fs-*` 的地方都乘上它 —— 面板自己那几行（属性名 / 提示 / 标题 / tab）
+ * 于是跟着正文一起缩放；没设过时 `var(--kbw-cw-scale, 1)` = 原样。
+ * ⚠️ **别在这里写死 `font-size`**：`--fs-*` 是全局刻度，写死会让"缩放"只动正文。
+ */
+.kbw-cw-panel { --kbw-cw-scale: 1; }
+.kbw-cw-row { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-1); }
+.kbw-cw-k {
+  flex: none;
+  width: calc(52px * var(--kbw-cw-scale, 1));
+  font-size: calc(var(--fs-2) * var(--kbw-cw-scale, 1));
+  color: var(--text-faint);
+}
+.kbw-cw-row .kbw-input,
+.kbw-cw-row .kbw-select { flex: 1 1 auto; min-width: 0; }
+.kbw-cw-panel .kbw-input,
+.kbw-cw-panel .kbw-select { font-size: calc(var(--fs-3) * var(--kbw-cw-scale, 1)); }
+.kbw-cw-hr { height: 1px; background: var(--background-modifier-border); margin: var(--sp-2) 0; }
+.kbw-cw-sec { font-size: calc(var(--fs-1) * var(--kbw-cw-scale, 1)); color: var(--text-faint); margin: var(--sp-1) 0; }
+.kbw-cw-props { display: flex; flex-direction: column; overflow: auto; min-height: 0; }
+.kbw-cw-note { font-size: calc(var(--fs-1) * var(--kbw-cw-scale, 1)); color: var(--text-faint); margin-top: var(--sp-1); }
+.kbw-cw-note.is-warn { color: var(--text-warning); }
+/**
+ * **正文块的高度**（f 期第 2 条：正文要拿大头）。
+ *
+ * 改前是固定 `220px` —— 用户截图里的观感就是"正文只占中间一小条"，而它的上限其实
+ * 是"面板限高 78vh 减去头部与属性块"。现在给到 `min(50vh, 420px)`：
+ *  · **短笔记**不会因此变成一扇空荡荡的大窗（面板高度仍是内容撑的）；
+ *  · **长笔记**能一眼多读到一倍多的内容；
+ *  · 属性行多的时候由属性块**先让位并自己滚**（那条 a5 的修正不能丢，见下）。
+ */
+.kbw-cw-editor {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--recessed);
+  height: min(50vh, 420px);
+  overflow: auto;
+  position: relative;
+}
+/**
+ * **只读预览的换行**（P6b ⑥）：与 `.kbw-card-body` 是**同一套口径**（两处一起改）。
+ * 默认折行（`overflow-wrap: anywhere`，不用 `word-break`）；`.is-nowrap` = 用户关掉了
+ * → 文本按原样、容器横滚。⚠️ 边界：`white-space` 管不到表格/代码块，它们照旧按内容宽度排。
+ */
+.kbw-cw-preview { overflow-wrap: anywhere; overflow-x: hidden; white-space: normal; }
+.kbw-cw-preview.is-nowrap { white-space: nowrap; overflow-x: auto; overflow-wrap: normal; }
+/* ⚠️ 挂上去的 leaf **自带 `.view-header`**（一整排 ← → 标题 ⋮）→ 必须藏 */
+.kbw-cw-leaf { height: 100%; display: flex; flex-direction: column; }
+.kbw-cw-leaf .view-header { display: none; }
+/* ⚠️ `overflow: auto` 会让**外层**变成滚动容器，而 CodeMirror 的 `scrollIntoView`（"滚到某一行"）
+   滚的是它**自己的**滚动容器 —— 两边不一致时症状是"行号设上了、视口纹丝不动"
+   （a.5-5 真机实测）。这里让 CM 自己滚：容器不接管溢出。 */
+.kbw-cw-leaf .view-content { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+/**
+ * 前言由上面的属性行负责编辑 → 编辑器里那份属性面板藏掉（免得同一件事两个入口）。
+ *
+ * 🔴 **外壳靠"变量覆盖"藏，权重路线压不过**（P7.0a 批 1①，2026-10-02 真机对照实验）：
+ * 平台生效规则的规则体是 `display: var(--metadata-display-editing)`（变量默认 `block`，
+ * `obsidian.asar` 里能读到 `--metadata-display-editing: block`），而它的选择器叠到
+ * **5 个类**：`.markdown-source-view.is-live-preview.show-properties .metadata-container:not(.mod-error)`
+ * —— ⚠️ **`:not()` 里的类也计入权重**，所以第九段按"4 个类"算的那版**压不过**
+ * （实测：重复类名 3 类 = block ✗；堆到 6 个类才 = none ✓）。
+ * 而**在作用域内重新声明这个变量**与选择器权重无关 —— 实测直接变 none ✓（同效的只有 `!important`，
+ * 那个更重、不说理）。
+ * ⇒ 取变量覆盖：一行、语义明确；哪天台方改名/换做法 → **探针 `P7.0a ①` 会红**
+ *（那条判据（computed none + 自有属性行 ≥1）就是为它写的）。
+ * ⚠️ 这段注释原先写的是"两个都要 CSS 藏" —— 而实现层**从来没藏住过外壳**
+ *（只是以前没人打开到 `show-properties` 状态，所以没露出来）。
+ * `.metadata-properties` 那条本来就赢（平台没有同属性更高权重的规则）→ 保留原样。
+ */
+.kbw-cw-leaf { --metadata-display-editing: none; }
+.kbw-cw-leaf .metadata-container,
+.kbw-cw-leaf .metadata-properties { display: none; }
+
+/* 悬浮小窗的限高：属性行可能有十来个，不限的话正文编辑器会被挤到屏幕外（真机截屏实测） */
+.kbw-cw-panel { max-height: min(78vh, 760px); display: flex; flex-direction: column; }
+
+/* ── 停靠态（d2 §3.1）─────────────────────────────────────────
+   窗格的高度是**整页高**（左/右停靠）或三四百像素（底部），按浮层那套
+   "编辑器固定 220px" 会白扔掉一大半空间。所以停靠态下重排一次高度分配：
+   属性区先让位、正文编辑器吃掉剩下的。
+   ⚠️ 只动停靠态 —— 浮层那条路一个字不改（`.kbw-cw-panel` 那几条仍是原样）。 */
+.kbw-cw-panel.is-docked .kbw-panel-body { flex: 1 1 auto; }
+.kbw-cw-panel.is-docked .kbw-cw-cblock { flex: 1 1 auto; min-height: 0; }
+.kbw-cw-panel.is-docked .kbw-cw-editor {
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 140px;
+}
+/**
+ * 停靠 ≈ **恒钉住**，图钉这时候点不点都一样 → 藏起来（留一个点了看不出效果的开关
+ * 比藏起来更让人犯嘀咕）。「两处入口同一个开关」那条不变：空白处右键里还有一份。
+ */
+.kbw-cw-panel.is-docked .kbw-pin-btn { display: none; }
+/**
+ * ⚠️ 这一窗的高度分配（独立审查 P4.5-a5 的 🔴2 修正）：
+ *  · body 是 flex item，内容超高时**先被压缩** → 早先 `overflow: hidden` 把压掉的那截**裁掉**，
+ *    而 `.kbw-cw-props` 在块布局里 `overflow:auto` 是**永远不滚**的（高度 auto、没有约束）
+ *    → 小窗底部（编辑器的下半截 + 「关窗自动保存」那行）被裁掉且**用户滚不回来**。
+ *  · 修法：**让属性区承担收缩与滚动**，编辑器永远完整。
+ */
+.kbw-cw-panel .kbw-panel-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.kbw-cw-panel .kbw-cw-props { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.kbw-cw-panel .kbw-cw-editor { flex: 0 0 auto; }
+
+/* ── 多篇分页（d 期 §3.1）───────────────────────────────────────
+   面板里每个 tab 一页，切换只切显隐（**不重建** —— 重建要重挂编辑器、还会丢光标）。
+   高度分配顺着上面那条铁律往下传：page 是 body 的 flex 项，属性块在它里面承担收缩与滚动。 */
+.kbw-cw-page { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+/**
+ * 属性块（f 期第 5 条）：**限高 + 中段可滚**。
+ *  · `max-height: 45%` 是"自动档"的上限 —— 属性行再多也不会把正文挤没
+ *   （这正是用户截图里的毛病：属性占掉大半，正文只剩一条缝）；
+ *  · `flex: 0 1 auto`：**可以让位**（面板顶到 78vh 时先压它、由里面的 `.kbw-cw-props` 滚），
+ *    而正文块是 `flex: 0 0 auto` —— **编辑器永远完整**（a5 那条 🔴2 的修正不能丢）。
+ */
+.kbw-cw-pblock {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 45%;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+.kbw-cw-cblock { display: flex; flex-direction: column; flex: 0 0 auto; }
+/**
+ * **拖过分隔条之后**（`is-split`）：比例说话，块高度按页高的百分比分。
+ * 与卡片那条 `is-split` 同一个形状（`--kbw-props-pct`），只是这里的"页"就是这一篇的整页。
+ * ⚠️ 百分比要有确定的基准：拖过一次之后**正文块与属性块都按比例分**（正文 `flex: 1 1 auto`），
+ * 页本身的高度仍由内容撑（面板限高兜底）—— 所以两端都能拖得动、也不会算出负高度。
+ */
+.kbw-cw-page.is-split .kbw-cw-pblock {
+  flex: 0 0 var(--kbw-cw-props-pct, 40%);
+  max-height: none;
+}
+.kbw-cw-page.is-split .kbw-cw-cblock { flex: 1 1 auto; min-height: 0; }
+.kbw-cw-page.is-split .kbw-cw-editor { height: auto; flex: 1 1 auto; min-height: 90px; }
+
+/**
+ * 属性 / 正文之间那根**可拖的分隔条**（f 期第 5 条）。
+ * 命中区 6px（与窗格那根 `--kbw-dock-grip` 同一手感）；形状照卡片那根（`.kbw-card-split`）。
+ * `touch-action: none` 必须有：否则触屏上浏览器把它当滚动接管，拖动永远起不来
+ *（卡片那根踩过，注释写在 `cards.ts` 的 `cardSplit` 顶上）。
+ */
+.kbw-cw-split {
+  flex: none;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  touch-action: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.kbw-cw-split-grip {
+  width: 44px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+}
+@media (hover: hover) {
+  .kbw-cw-split:hover .kbw-cw-split-grip { background: var(--interactive-accent); }
+}
+.kbw-cw-split:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+
+.kbw-cw-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 0 var(--sp-3) var(--sp-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/**
+ * tab 条挂在面板根上（`insertBefore(strip, h.body)`），**不在页里** ——
+ * 所以它的字号跟着**根上**的 `--kbw-cw-scale`（由 `activate`/`rebuildAll` 按当前这一篇写），
+ * 见 `panel-ui.ts` 的 `applyPanelScale`（独立审查 🟡2：原先这几处没乘，缩放只动了页内）。
+ */
+.kbw-cw-tab {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  max-width: 190px;
+  padding: 2px 2px 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: calc(var(--fs-2) * var(--kbw-cw-scale, 1));
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.kbw-cw-tab.is-on {
+  background: var(--recessed);
+  border-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+.kbw-cw-tabname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ✕ 只在**当前 tab** 与悬停时露出来（一排都挂 ✕ 会吵） */
+.kbw-cw-tabx {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: calc(var(--fs-3) * var(--kbw-cw-scale, 1));
+  line-height: 1;
+  opacity: 0;
+}
+.kbw-cw-tab.is-on .kbw-cw-tabx { opacity: 0.7; }
+@media (hover: hover) {
+  .kbw-cw-tab:hover .kbw-cw-tabx { opacity: 0.7; }
+}
+/* 触屏没有悬停 → 那个 ✕ 永远摸不到，所以触屏上**常显**（否则关不掉某一篇） */
+body.is-mobile .kbw-cw-tabx { opacity: 0.7; }
+.kbw-cw-tabclose-all { flex: none; margin-left: auto; }
+/* 正在被拖出去的那一篇：淡下去（P6b ③ 的"拆窗"手势；松手后排到新窗/别的窗里） */
+.kbw-cw-tab.is-dragging { opacity: .45; }
+
+/* ── 面板头：一行（P6b ⑤）─────────────────────────────────────
+   原来非正文部分是四层：面板头（标题 + 整条路径 + 图钉/齿轮）+ tab 条 + 标题行 + 「正文」标签
+   ≈140px（面板 760 高时占 18%）。现在：**标题就是输入框**（并进头这一行）、
+   路径缩成短目录、单篇不画 tab 条、正文不要标签 → **一行 ≈ 40px**。 */
+.kbw-cw-panel .kbw-panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+/* 标题输入框：占满剩余宽度，长得像标题而不像表单（无边框、字号跟着面板比例） */
+.kbw-cw-panel .kbw-cw-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 2px var(--sp-1);
+  border-radius: var(--radius-s, 4px);
+  font-size: calc(var(--fs-4) * var(--kbw-cw-scale, 1));
+  font-weight: 600;
+  line-height: var(--lh-1);
+}
+@media (hover: hover) {
+  .kbw-cw-panel .kbw-cw-title:hover { background: var(--background-modifier-hover); }
+}
+.kbw-cw-panel .kbw-cw-title:focus {
+  background: var(--recessed);
+  border-color: var(--background-modifier-border);
+}
+/* 短目录：一行小字，跟着标题走，太长就省略（全路径在 title 属性里） */
+.kbw-cw-panel .kbw-panel-sub {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 0;
+  font-size: calc(var(--fs-1) * var(--kbw-cw-scale, 1));
+}
+
+/**
+ * **右下角的缩放手柄**（P6b ③，用户原话："窗口可以拖动、缩放，类似 Windows 窗口"）。
+ * 视觉 12×12、**命中区 ±7px**（`::before` 撑出去）—— 与列宽抓手、卡片分隔条同一档。
+ */
+.kbw-panel-grip {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: .55;
+  /* 两道斜线（Windows 右下角那个记号的画法）—— 不用图标，省一个 SVG */
+  background:
+    linear-gradient(135deg, transparent 45%, var(--text-faint) 45%, var(--text-faint) 55%, transparent 55%),
+    linear-gradient(135deg, transparent 72%, var(--text-faint) 72%, var(--text-faint) 82%, transparent 82%);
+  border-bottom-right-radius: var(--kbw-menu-radius, 6px);
+}
+.kbw-panel-grip::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
+@media (hover: hover) {
+  .kbw-panel-grip:hover { opacity: 1; }
+}
+.kbw-panel.is-docked .kbw-panel-grip { display: none; }
+.kbw-panel.is-resizing { user-select: none; }
+
+/**
+ * **「我在这里」闪一下**（P6b ③：点到已经开着的那一篇 → 抬到最前 + 闪一下）。
+ * 🔴 「动效 = 减少」时**不走**那两段 1ms 规则（P6b 实测：1ms 会让 animationend 当场触发、
+ * 动画类被立刻摘掉，**用户什么也看不到**）—— 判在 JS 里、换成 `.is-flash-static`
+ * 静态描边钉 1 秒。这就是"到点消失型"动效的降级范式（P7.7 · 10.1 归档）。
+ */
+@keyframes kbw-panel-flash {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--interactive-accent) 70%, transparent); }
+  100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--interactive-accent) 0%, transparent); }
+}
+.kbw-panel.is-flash {
+  border-color: var(--interactive-accent);
+  animation: kbw-panel-flash var(--t-flash) var(--ease-enter);
+}
+/**
+ * **「动效 = 减少」时的降级形态**：静态主题色描边（钉 1 秒）。
+ * ⚠️ 它**不是**靠那两段 `animation-duration: 1ms` 的规则实现的 —— 那样 `animationend`
+ * 会当场触发、动画类被立刻摘掉，等于**什么反馈都没有**（真机判据就是这么发现它的）。
+ * 判在 JS 里（`PanelHandle.flash`），这一条只负责长相。
+ */
+.kbw-panel.is-flash-static {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+}
+
+/**
+ * **拖窗合并**（P6b ③）：目标窗整窗描边 + 顶部一条「松手并入这一扇」。
+ * ⚠️ 源窗加 `.is-merge-source` 时**半透明**（`ui/panel.ts` 不动它的位置）——
+ * 它跟着光标走，压住目标窗就看不见"并进去的是哪一扇"了。
+ */
+.kbw-panel.is-merge-target {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 28%, transparent), var(--kbw-menu-shadow);
+}
+.kbw-panel.is-merge-source { opacity: .45; }
+.kbw-panel-merge-hint {
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  transform: translateX(-50%);
+  padding: 3px var(--sp-2);
+  border-radius: 10px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+  font-size: var(--fs-1);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/**
+ * **尺寸浮标**（P6b ④）：`Ctrl+Shift+滚轮` 或拖手柄时在面板头右侧浮一行「420 × 560」，
+ * 手势结束 800ms 后淡出（`editor.ts` 管时机，这里只管长相）。
+ */
+.kbw-cw-size {
+  flex: none;
+  font-size: calc(var(--fs-1) * var(--kbw-cw-scale, 1));
+  color: var(--text-muted);
+  background: var(--recessed);
+  border-radius: var(--radius-s, 4px);
+  padding: 1px 6px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity var(--t-base) var(--ease);
+}
+.kbw-cw-size.is-on { opacity: 1; }
+
+/* 面板标题与底部按钮：同样跟**根上**的比例（独立审查 🟡2） */
+.kbw-cw-panel .kbw-panel-title { font-size: calc(var(--fs-4) * var(--kbw-cw-scale, 1)); }
+.kbw-cw-panel .kbw-panel-sub { font-size: calc(var(--fs-1) * var(--kbw-cw-scale, 1)); }
+.kbw-cw-panel .kbw-panel-foot .kbw-btn { font-size: calc(var(--fs-2) * var(--kbw-cw-scale, 1)); }
+
+/* 面板头那颗图钉：钉住时点亮（与「取消钉住」的文案一起表达状态） */
+.kbw-panel-actions .kbw-iconbtn.is-on {
+  color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+/* ── 板块管理面板 ───────────────────────────────────────────── */
+.kbw-bp { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 380px; }
+.kbw-bp-hint { font-size: var(--fs-1); color: var(--text-faint); margin-bottom: var(--sp-1); }
+.kbw-bp-row { border: 1px solid var(--background-modifier-border); border-radius: 8px; }
+.kbw-bp-row.is-dragging { opacity: .55; }
+.kbw-bp-head { display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-1) var(--sp-2); }
+.kbw-bp-grip { color: var(--text-faint); cursor: grab; display: inline-flex; }
+.kbw-bp-nm { font-size: var(--fs-3); cursor: default; }
+.kbw-bp-count { font-size: var(--fs-1); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.kbw-bp-count.is-zero { color: var(--text-faint); }
+.kbw-bp-kind {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.kbw-bp-detail {
+  border-top: 1px solid var(--background-modifier-border);
+  padding: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.kbw-bp-field { display: flex; align-items: center; gap: var(--sp-2); }
+.kbw-bp-field.is-col { flex-direction: column; align-items: stretch; }
+.kbw-bp-label { flex: none; width: 76px; font-size: var(--fs-2); color: var(--text-faint); }
+.kbw-bp-note { font-size: var(--fs-1); color: var(--text-faint); }
+.kbw-bp-add { border: 1px dashed var(--background-modifier-border); border-radius: 8px; padding: var(--sp-2); display: flex; flex-direction: column; gap: var(--sp-1); }
+.kbw-bp-add-t { font-size: var(--fs-2); color: var(--text-muted); }
+.kbw-bp-add-row { display: flex; align-items: center; gap: var(--sp-2); }
+.kbw-bp-add-k { width: 56px; flex: none; font-size: var(--fs-2); color: var(--text-faint); }
+.kbw-bp-foot { display: flex; justify-content: flex-end; padding-top: var(--sp-1); }
+.kbw-iconbtn.is-armed { color: var(--text-error); }
+
+html.kbw-bp-dragging, html.kbw-bp-dragging * { cursor: grabbing !important; user-select: none; }
+
+/* 悬停：一律包进 `(hover: hover)`（触屏点完不留态） */
+@media (hover: hover) {
+  .kbw-sect-head:hover { background: var(--background-modifier-hover); }
+  .kbw-cards:not(.is-drop):hover { }
+  .kbw-card:hover { border-color: var(--background-modifier-border-hover, var(--background-modifier-border)); }
+  .kbw-card-more:hover { background: var(--background-modifier-hover); }
+  .kbw-sect-caret:hover { background: var(--background-modifier-hover); }
+  .kbw-sect-nm[role="button"]:hover { color: var(--text-accent); }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   板块形态：列 / 流式（P4.5 §2.1，拍板 Q4 = 列默认、流式可选）
+   ──────────────────────────────────────────────────────────────────
+   前缀 `.kbw-root:not([data-w='narrow']) .kbw-board.is-cols` 的两半各管一件事：
+
+     · `.kbw-board.is-cols` —— 配置里选了列（`view.flow !== 'flow'`，**缺省就是列**）。
+       类名由 `board/index.ts` 的 `applyFlow()` 贴在模块宿主上。
+
+     · `:not([data-w='narrow'])` —— **窄档强制回流式**（§2.1 / 交互规格 §5.8 的老规矩：
+       窄屏不横向滚）。`data-w` 是 `view/workbench-view.ts` 量**容器宽**打上的（唯一口径），
+       这里不再自己量一次、也不看 UA —— 触控与窗口宽是两回事（S4 真机实测过）。
+
+   所以"窄档"不需要任何 JS 参与：窗口挤窄 → `data-w` 变 narrow → 下面这些规则整批不匹配，
+   回落到上面的基础（流式）样式。**别在 JS 里再判一次窄不窄**（两处判迟早会漂）。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 板块并排、横向滚；列高撑满可用高度（`align-items: stretch` + body 的定高） */
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-board-body {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--sp-3);
+  overflow-x: auto;
+  /**
+   * ⚠️ 纵向是 `auto` 而**不是 `hidden`**（用户 2026-09-25 反馈："整个页面无法上下翻动，
+   * 一栏内底部的文件看不到"）。列自己会滚（`> .kbw-cards` 那条），正常情况下这里没有可滚的余量；
+   * 但只要出现"列比可视区还高"的情形（窗口特别矮 / 宿主高度没撑住），
+   * `hidden` 就把**列的下半截彻底锁死**、用户怎么滚都看不到 —— 而 `auto` 最坏也只是多一条滚动条。
+   */
+  overflow-y: auto;
+}
+
+/* 🔴 卡片是**裁剪盒**（用户 2026-09-25 截图："属性文字跑到板块外面去"）。
+   卡内所有元素本来都有自己的收缩/折行规则（`.kbw-card { max-width: 100% }`、`overflow-wrap: anywhere`、
+   网格 `minmax(0,1fr)`…），但那些都是"**每个元素各自**别越界"，任何一个新面板忘了其中一条就会漏出去
+   （a.5 那次 + 这次各漏一次）。`overflow: hidden` 是**最后一道**：不管谁写错，都只会在卡里被裁掉，
+   不会跑到别人家的板块上。代价：卡内元素的阴影/外扩装饰会被裁 —— 卡里目前没有这种装饰。 */
+.kbw-card { overflow: hidden; }
+
+/* 一列 = 一个板块。列宽 = **卡片宽度 + 列自己的左右内边距**（复用 cardWidth，不另造参数） */
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-sect {
+  flex: 0 0 auto;
+  width: calc(var(--kbw-card-w, 240px) + 2 * var(--sp-2));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 0;
+  padding: 0 var(--sp-2);
+}
+/* 头与卡片**左对齐到同一条线**：把各自那点水平内边距让给列自己的 padding */
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-sect > .kbw-sect-head {
+  padding-left: 0;
+  padding-right: 0;
+}
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-sect > .kbw-cards {
+  flex: 1 1 auto;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  align-content: flex-start;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-left: 0;
+  padding-right: 0;
+  padding-bottom: var(--sp-4);
+  /**
+   * 列内滚，但**条藏起来**（与卡片标题那条同一个取舍：能力留着、只是不占位）。
+   * 📏 真机量到的数（2026-09-25）：Windows 上这条竖滚动条吃掉 **12px** 宽度，
+   * 而 `.kbw-card { max-width: 100% }`（a.5 那条兜底）会把卡片压到 228 ——
+   * 于是"用户设 240 却拿到 228"，而列头仍然是 240 宽 → 右边缘参差。
+   * 藏掉之后卡片正好是 `cardWidth`（列宽 = 卡片宽度 这条承诺才算兑现），
+   * 滚轮 / 触板 / 触屏横扫照样能滚。
+   */
+  scrollbar-width: none;
+}
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols
+  .kbw-sect > .kbw-cards::-webkit-scrollbar {
+  width: 0;
+  display: none;
+}
+
+/* 子板块仍是**独立一列**（Q1 拍板「值 = 独立一列」，两形态语义一致、零分叉）——
+   流式下那条"缩进 + 竖参考线"在列里既占宽又对不齐，改成一个小 ↳ 记号 */
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-sect.is-sub {
+  margin-left: 0;
+  padding-left: var(--sp-2);
+  border-left: 0;
+}
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-sect.is-sub .kbw-sect-nm::before {
+  content: '↳ ';
+  color: var(--text-faint);
+}
+
+/* 插入位指示线：流式下是"插在横向流里的 2px 竖条"，列形态下卡片是**纵向**堆的 →
+   同一条线转 90° 变成横条。仍是一个 flex 项、仍不算坐标（`slotFromRects` 本来就是
+   按行找落点：列里每张卡各占一行，同一个函数直接就对） */
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-dropline {
+  width: auto;
+  height: 2px;
+  min-height: 0;
+  margin: calc(1px - var(--kbw-gap, 12px) / 2) 0;
+  animation: kbw-dropline-in-x var(--t-fast) var(--ease-enter);
+}
+@keyframes kbw-dropline-in-x {
+  from { opacity: 0; transform: scaleX(.7); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
+/* ── 竖条档（列形态下的收起态，§2.1 / Q4）─────────────────────────
+   收起时不是整块消失，而是留一条 ~40px 的竖条（竖排名字 + 计数），点一下展开。 */
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-sect.is-collapsed {
+  width: 40px;
+  padding: 0;
+}
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols .kbw-sect.is-collapsed > .kbw-sect-head {
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--sp-2) 0;
+}
+/* 除竖条与**落点预告**之外的头内容全隐。
+   ⚠️ 用 `:not(...)` 排除，而不是"先全隐、再给竖条点亮 display:flex"——
+   后者两条规则特异性相同，谁生效全看源码顺序（改天有人在中间插一条就悄悄坏了）。
+   ⚠️ `.kbw-sect-preview`（「N → M」）必须一起豁免（独立审查 🟡3）：它是 `paintDrag`
+   在拖动途中**挂进板块头**的，藏了头内容就把它一起藏掉了 —— 拖到一条竖条上时高亮还在、
+   却不知道会落到哪一块（§1.1 的承诺在"目标块收起"这个状态漏了；流式下同一操作有预告）。 */
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols
+  .kbw-sect.is-collapsed > .kbw-sect-head > :not(.kbw-sect-rail):not(.kbw-sect-preview) {
+  display: none;
+}
+/* 40px 的竖条塞不下那个胶囊 → 让它**浮**在竖条上方（位置写在板块头上，所以头要定位） */
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols
+  .kbw-sect.is-collapsed > .kbw-sect-head {
+  position: relative;
+}
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols
+  .kbw-sect.is-collapsed .kbw-sect-preview {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  pointer-events: none;
+}
+/**
+ * 竖条只在**收起态**的列里显示。
+ * 🔴 少写 `.kbw-sect.is-collapsed` 那半截的后果（真机截图抓到）：展开的列里竖条也冒出来，
+ * 它是个 `flex-direction: column` 的块，会把板块头那一行里的名字/计数**挤成一列一个字**
+ *（标题看起来变成竖排的"内/容/创/作"）—— 而**所有几何判据都是绿的**：
+ * 列宽、列高、可滚、收起 40px、点它展开……一个都没红。量出来的东西全对，坏的是"多了一个元素"。
+ */
+.kbw-root:not([data-w='narrow']) .kbw-board.is-cols
+  .kbw-sect.is-collapsed .kbw-sect-rail {
+  display: flex;
+}
+
+/* 竖条本体。它在流式下 `display: none`（那边收起的语义不变：只留头那一行） */
+.kbw-sect-rail {
+  display: none;
+  /**
+   * 🔴 **竖条必须撑满板块头**（用户 2026-09-25 截图："收起后显示的内容非常奇怪，至少要保留板块名"）。
+   * 根因：竖条是板块头（列形态收起时 `flex-direction: column`）里的 flex 项，默认 `flex-grow: 0`
+   * → 它只有内容那么高（真机量到 **40×30px**），于是里面的名字（`flex: 1 1 auto` + `min-height: 0`）
+   * 分不到空间、被压成 **0 高** —— 竖排名字**一个字都不显示**，只剩那颗小计数。
+   * 修法：`flex: 1 1 auto` 让它吃满整个头，名字才有余量可拿。
+   */
+  flex: 1 1 auto;
+  min-height: 0;
+  /* 它是个**真 `<button>`**（键盘 Enter/Space 的原生激活白送），所以平台给按钮的样式要清干净。
+     ⚠️ 平台的按钮用 `box-shadow: inset 0 0 0 1px …` 当边框、用半透明底当填充 ——
+     只清 border/background 会留下一圈"虚线环"（本项目踩过）。 */
+  appearance: none;
+  box-shadow: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  width: 100%;
+  border-radius: 8px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  overflow: hidden;
+}
+/**
+ * 竖条里的名字（f 期第 1 条，用户 2026-09-26 的截图）。
+ *
+ * 🔴 **改前是 `writing-mode: vertical-rl; text-orientation: upright`**（真·竖排）——
+ * 4 个字的板块名于是占 **4 行**（内/容/创/作），40px 宽的竖条里挤成一条细线。
+ * 用户要的是"**最多两行**"（内容 / 创作）。
+ *
+ * 现在的写法（**正排 + 限高两行**）：
+ *  · `writing-mode` 回默认（`horizontal-tb`）→ 中文按字断行，40px 宽正好两字一行；
+ *  · `max-height: 2lh` = **两倍行高**（`lh` 就是 line-height，自己跟着上面的值走）——
+ *    ⚠️ 兜底那行 `2.3em` 与 `line-height: 1.15` 是同一个数的两种写法（老浏览器没有 `lh`），
+ *    改行高时**两处一起改**；
+ *  · 🔴 **不许用 `-webkit-line-clamp`**（本项目踩过：它是 legacy flexbox，
+ *    会把块级子元素**压扁**而不是裁切 → 文字互相重叠）。限高 + `overflow: hidden` 是安全写法，
+ *    代价是 3 行以上的名字**没有省略号**（靠 `title`/`aria-label` 里的全名认人）。
+ */
+.kbw-rail-nm {
+  writing-mode: horizontal-tb;
+  word-break: break-all;
+  /**
+   * 🔴 **`white-space` 必须显式写回 `normal`**（真机实测第二刀）：竖条是个真 `<button>`，
+   * 而平台给按钮的样式里有 `white-space: nowrap` → 名字**永远不折行**，只被限宽裁掉。
+   * 光加 `max-width` 是不够的（第一版就是这么"看着改了、其实没折"的）。
+   */
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+  /**
+   * 🔴 **必须限宽，否则根本不会折行**（真机实测抓的）：竖条是 `flex-direction: column`
+   * + `align-items: center`，名字是它的 flex 项 → 交叉轴（宽）按 **max-content** 走，
+   * 48px 的长名字就是**一整行 102px**、被竖条的 `overflow: hidden` 裁掉（看着像"只显示了前三个字"），
+   * 两行封顶那条 `max-height` 完全轮不到它。限成 **2.2em ≈ 两个字**，
+   * `内容创作` 才会排成「内容 / 创作」两行（用户截图里要的就是这个）。
+   */
+  max-width: 2.2em;
+  max-height: 2.3em; /* = 2 × 1.15（与上一行同源；老引擎走这条） */
+  max-height: 2lh; /* 真机（Chromium ≥ 114）走这条：两倍行高 */
+  font-size: var(--fs-2);
+  font-weight: 600;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.kbw-rail-n { font-size: var(--fs-1); color: var(--text-faint); flex: none; font-variant-numeric: tabular-nums; }
+
+@media (hover: hover) {
+  .kbw-sect-rail:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+}
+
+/* 小窗里「显示全部属性（N）」那条链接：贴左，别跟着属性网格的列走 */
+.kbw-cw-props .kbw-cw-more { align-self: flex-start; margin-top: var(--sp-1); }
+
+/* ══════════════════════════════════════════════════════════════════
+   预览窗格 · Peek（P4.5 e 期 §3.2）
+   ──────────────────────────────────────────────────────────────────
+   它走的是 `ui/panel.ts` 的浮层（`openFloating`）+ `setDocked(host)` ——
+   所以「窗格」那一套（`position: static` / 填满宿主 / 没有圆角阴影）**全是现成的**
+   （`styles/panel.css` 的 `.kbw-panel.is-docked`），这里只管内容排布。
+
+   ⚠️ 与编辑面板**共用同一个停靠宿主**（`看板优化方案.md` §6.15 拍板：互斥）——
+   宿主宽高的口径在 `styles/shell.css` 的 `.kbw-dock`，这里一个字都不碰。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 头一两行 + 一整块正文，中间不夹别的东西 */
+.kbw-peek .kbw-panel-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden; /* 滚的是 `.kbw-peek-body`，不是整块（否则标题会跟着滚掉） */
+}
+.kbw-peek-head {
+  flex: none;
+  padding: var(--sp-2) var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.kbw-peek-nm { font-size: var(--fs-4); font-weight: 600; overflow-wrap: anywhere; }
+/* 路径行：一屏里"跟的是哪一篇"要一眼看得出来（同名的笔记不止一篇） */
+.kbw-peek-path {
+  margin-top: 2px;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+.kbw-peek-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-3);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+}
+.kbw-peek-md > :first-child { margin-top: 0; }
+.kbw-peek-md > :last-child { margin-bottom: 0; }
+.kbw-peek-empty {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  padding: var(--sp-2) 0;
+}
+.kbw-peek-empty.is-warn { color: var(--text-warning); }
+/* 头里那个空态（没有光标）不占底下那一大块 */
+.kbw-peek-head .kbw-peek-empty { padding: 0; }

@@ -1,0 +1,671 @@
+/* ══════════════════════════════════════════════════════════════════
+   notes · 全部笔记（P1）：面包屑 / 目录树 / 工具栏与批量栏 / 表格
+   ──────────────────────────────────────────────────────────────────
+   两条密度（交互规格 §3.2）：详细信息 **31px** 行高 · 紧凑 **26px** 行高。
+   （31 是 `交互规格.md` 的两处口径；`方案设计.md` 里写的 32 是旧稿，
+     按文档优先级 交互规格 > 方案设计 取 31。菜单项那 32px 是另一回事。）
+
+   零硬编码色：全部走 tokens.css 的别名与平台变量。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 这一屏是"满幅"的：模块区默认有 20px 内边距，表格要贴着边 */
+.kbw-modhost:has(.kbw-notes) { padding: 0; }
+
+.kbw-notes { height: 100%; min-height: 0; }
+.kbw-notes-shell {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── 左：目录树 ─────────────────────────────────────────────── */
+.kbw-notes-side {
+  /* 🔴 **宽度只有一个真源**：`--kbw-col-w`（定义在 `shell.css`，档位也在那儿）。
+     顶栏那个列头槽（④-A）读的是**同一个变量** —— "槽宽 == 目录栏宽"因此是**结构上**成立的，
+     不再靠两处各写一个数（P6b 独立审查 A🔴2：灰带 208 vs 目录栏 168 就是这么差的）。
+     ⚠️ 兜底值要留着：离线单测把 notes 模块渲染进一个**没有 `.kbw-root`** 的裸宿主时，
+     变量不存在 —— 没有兜底就是 `width` 整条失效（变 auto），那批用例会莫名其妙红。 */
+  width: var(--kbw-col-w, 208px);
+  flex: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--background-modifier-border);
+  background: var(--surface-0);
+}
+.kbw-tree { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.kbw-tree-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+/**
+ * **住进顶栏列头槽里的那一份**（P6 段⑥ ④-A）。
+ *
+ * 同一份 DOM（`renderTree` 造的 `.kbw-tree-head`），换了个父容器 → 三条要改：
+ *  · 左右内边距归零：**槽自己已经有 `padding-left: var(--sp-3)`**，留着就是两份；
+ *  · 下边框摘掉：那一行是顶栏，槽的灰底要跟顶栏连成一片，横线会把它切成两截；
+ *  · `flex: 1`：让拖动预告（`margin-left:auto`）能顶到槽的右端。
+ * ⚠️ 别用「`.kbw-colslot .kbw-tree-head` 只改一部分」的写法 —— 少改一条就会出现
+ * "标题离左边 24px、底下多一条线"这种半吊子，而且**离线看不出来**（桩里没有布局）。
+ */
+.kbw-colslot .kbw-tree-head {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border-bottom: none;
+}
+.kbw-tree-title {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  letter-spacing: .04em;
+}
+/* 拖动时的「4 → 7」预告：固定在右上角，不跟着指针跑（免得挡视线） */
+.kbw-tree-preview {
+  margin-left: auto;
+  font-size: var(--fs-1);
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 9px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+  font-variant-numeric: tabular-nums;
+  animation: kbw-pop var(--t-fast) var(--ease-enter);
+}
+.kbw-tree-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-1) var(--sp-1) var(--sp-4);
+}
+.kbw-tree-item {
+  display: flex;
+  align-items: center;
+  /* ⚠️ `gap` 与左边距都是稿子的数（⑩ 对表）：`.tnode{gap:6px;padding:5px 7px}`。
+     左边距在 `modules/notes/tree.ts` 里按 `7 + 层号 × 14` 现算（稿子 lv2=21 / lv3=35）。 */
+  gap: 6px;
+  height: 26px;
+  padding-right: var(--sp-2);
+  border-radius: var(--radius-s, 4px);
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+}
+.kbw-tree-item.is-on {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+/* 拖动掠过：虚线环 + 底色，和"选中"区分开（选中是实心左边条） */
+.kbw-tree-item.is-drop {
+  background: var(--background-modifier-hover);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+.kbw-tree-caret {
+  width: 14px;
+  flex: none;
+  text-align: center;
+  /* ⚠️ 同 `.kbw-chk i`：这是**控件**不是说明文字 —— `--text-faint` 实测 2.1:1（亮）/ 2.6:1（暗），
+     低于 3:1；触屏上它还是展开文件夹**唯一**的入口（⑧）。 */
+  color: var(--kbw-nontext);
+  font-size: 10px;
+  transition: transform var(--t-fast) var(--ease);
+}
+.kbw-tree-caret.is-open { transform: rotate(90deg); }
+.kbw-tree-caret.is-leaf { visibility: hidden; }
+.kbw-tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbw-tree-count {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+/* ── 行尾「收起」按钮（P7.24 · T1）──────────────────────────────
+   只在展开态出现（显示条件在 `modules/notes/tree.ts` 的 nodeRow —— CSS 不管显隐）。
+   命中区 24×24（pad+负 margin 规矩：26px 的行不许被撑高，盒子往行右缘的留白里伸）；
+   颜色走 `--kbw-nontext`（与 caret 同一条对比度理由：这是控件不是说明文字）。 */
+.kbw-tree-collapse {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 24 的盒子、13 的图标：往右让 5px，图标视觉上贴住行尾（不挤掉计数徽标的位置） */
+  margin-right: -5px;
+  border-radius: var(--radius-s, 4px);
+  color: var(--kbw-nontext);
+  cursor: pointer;
+}
+/* ⚠️ 顶层 :hover 一律就地包进 @media (hover: hover)（styles/base.css 铁律 1 /
+   platform-pitfalls #36）—— 第一版漏包，全量 mount 用例当场红（顶层 :hover 计数 0→1） */
+@media (hover: hover) {
+  .kbw-tree-collapse:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+  }
+}
+/* ── 文件行（P7.23：完全展开「含文件」后列在子目录之后）────────── */
+/* 无三角：用 file-text 图标占 caret 那一格（14px 同宽），名称列才与目录行对齐 */
+.kbw-tree-fileicon {
+  width: 14px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+}
+/* 拖动中：与原格同款"淡出但还在"（与 `.kbw-gcell.is-dragging` 同一条观感） */
+.kbw-tree-item.kbw-tree-file.is-dragging { opacity: .35; }
+
+/* ── 右：工具栏 / 批量栏 / 列表 ──────────────────────────────── */
+.kbw-notes-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.kbw-notes-toolbar { flex: none; border-bottom: 1px solid var(--background-modifier-border); }
+.kbw-notes-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: var(--sp-1) var(--sp-3);
+  /* ⚠️ 一行不换行 + 允许子项收缩：不加这两条，窗口一窄（停靠侧栏也是这个宽度）
+     面包屑会被裁成"全部笔记 /"、计数折成两行（真机截图抓到过） */
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+/* 批量栏：表头整体替换成操作栏（不占额外垂直空间） */
+.kbw-notes-bar.is-batch {
+  background: var(--background-modifier-hover);
+  border-bottom: 1px solid var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+.kbw-batch-count { font-size: var(--fs-3); font-weight: 600; font-variant-numeric: tabular-nums; }
+.kbw-batch-warn { font-size: var(--fs-1); color: var(--text-warning, var(--color-yellow)); }
+.kbw-batch-tail { margin-left: var(--sp-2); display: flex; align-items: center; gap: var(--sp-1); }
+.kbw-notes-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+  flex-wrap: nowrap;
+}
+
+.kbw-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+.kbw-crumb {
+  padding: 2px 6px;
+  border-radius: var(--radius-s, 4px);
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.kbw-crumb.is-on { color: var(--text-normal); font-weight: 600; }
+/* 拖笔记掠过面包屑段时的落点高亮（P7.1c ③；语言与文件夹行 `.kbw-frow.is-drop` / 网格
+   文件夹格同款 —— 主题色淡底 + 一圈 inset 环）。⚠️ 拖动期间工具条停在常规这一条
+   （`paintToolbar` 的 `dragActive` 分支），否则这一段根本不在 DOM 里。 */
+.kbw-crumb.is-drop {
+  background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+}
+.kbw-crumb-sep { color: var(--text-faint); font-size: var(--fs-1); }
+.kbw-crumbs-count {
+  margin-left: var(--sp-2);
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  white-space: nowrap;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.kbw-search {
+  /* 能收能放：窄了先缩搜索框，而不是把面包屑挤没 */
+  flex: 0 1 200px;
+  width: 200px;
+  min-width: 96px;
+  padding: 6px 10px;
+  border-radius: var(--radius-s, 4px);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--recessed);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--fs-2);
+}
+.kbw-select.is-small { font-size: var(--fs-2); padding: 5px 6px; }
+
+/* 窄容器：次要控件按序隐去（停靠侧栏也走这条）—— 布局照旧按 data-w */
+/* 面包屑：只收起"祖先段"，**当前目录永远留着**（不然"现在在哪"就看不见了） */
+.kbw-root[data-w='mid'] .kbw-crumb-ancestor,
+.kbw-root[data-w='mid'] .kbw-crumb-sep,
+.kbw-root[data-w='mid'] .kbw-crumbs-count,
+.kbw-root[data-w='mid'] .kbw-notes-tools .kbw-select.is-small { display: none; }
+.kbw-root[data-w='narrow'] .kbw-crumbs { display: none; }
+
+/* 三档视图的分段控件（网格档置灰 → 见 `.kbw-seg button[disabled]`） */
+.kbw-seg {
+  display: inline-flex;
+  /**
+   * 🔴 **`flex: none`**（P7.0a 批 1⑤）：原先没写 → 默认 `flex-shrink: 1`，
+   * 而触屏档（`mobile.css`）把按钮内边距抬到 12px → 整行超宽时浏览器**优先压它**，
+   * 末尾那个「网格」被自己的 `overflow: hidden` 裁掉一半（真机量到：内容 174px
+   * 挤在 144px 的盒子里，`设计建议-P6第九段.md` ⑤）。视图档是"固定几档"的按钮组，
+   * 不该被压扁 —— 让左边的搜索框（它本来就是伸缩项）去吸收。
+   */
+  flex: none;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  overflow: hidden;
+}
+/**
+ * ⚠️ 内边距那条**搬回 `components.css` 了**（⑩ 对表：这里原先写的是 `6px 10px`，
+ * 而稿子是 `7px 11px`、`components.css` 里也早就写对了 —— 这条覆盖纯属漂移）。
+ * 这一块**只留"选中态"这一条**：它是本项目对稿子/`components.css` 的**有意偏离**
+ *（安静版：hover 灰底 + 常规色文字，而不是稿子的 accent 填充）——
+ * 2026-09-28 对表时确认过真机效果就是这一版，本轮**不动它**（改它属于重设计，得单独拍）。
+ */
+.kbw-seg button.is-on { background: var(--background-modifier-hover); color: var(--text-normal); font-weight: 600; }
+.kbw-seg button[disabled] { opacity: .45; cursor: not-allowed; }
+
+/* ── 表格 ───────────────────────────────────────────────────── */
+.kbw-notes-list { flex: 1; min-height: 0; overflow: auto; }
+.kbw-tablewrap { height: 100%; }
+/* 列宽写在 <col> 上 → 必须固定布局，否则浏览器按内容重算宽 */
+.kbw-table { table-layout: fixed; width: 100%; border-collapse: collapse; font-size: var(--fs-3); }
+.kbw-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 0 10px;
+  height: 30px;
+  text-align: left;
+  font-size: var(--fs-1);
+  font-weight: 500;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.kbw-table th.is-sortable { cursor: pointer; }
+.kbw-table th.is-sorted { color: var(--text-normal); }
+.kbw-table th.is-right, .kbw-table td.is-right { text-align: right; }
+.kbw-th-label { display: flex; align-items: center; gap: 4px; }
+.kbw-th-dir { color: var(--interactive-accent); font-size: 10px; }
+
+/* 列宽抓手：桌面 ±7px 命中区；触屏在 mobile.css 里换成看得见的 32px 柄 */
+.kbw-col-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -7px;
+  width: 15px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.kbw-col-grip::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: transparent;
+}
+.kbw-tablewrap.is-resizing .kbw-col-grip::after { background: var(--interactive-accent); }
+/* 列宽自适应的"量具"（P7.1c ⑦）：width:max-content 的隐形块，由 `ui/table.ts` 临时挂进
+   表格容器里量一格内容的固有宽（挂在容器内才继承同一套字体；fixed 不参与布局；
+   visibility:hidden 而非 display:none —— 后者不排版，量出来恒 0）。 */
+.kbw-fitprobe {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .kbw-table th:hover .kbw-col-grip::after { background: var(--background-modifier-border-hover, var(--text-faint)); }
+}
+
+/* 行高：31px（详细信息档）—— 交互规格 §3.2（P7.1 两档化后这里只剩一条；
+   要 26px 的小行高走设置里的「密度：紧凑」=`[data-density='compact']`，与视图档无关）。
+   ⚠️ **P7.1b 起 `.kbw-frow`（文件夹行）与 `.kbw-trow` 同刻度** —— 它是表格里的真 `<tr>`，
+   只是**不是笔记行**（没有 data-path / 复选框；类名刻意分开，见 `ui/table.ts` 的 `topRows`）。 */
+.kbw-table .kbw-trow, .kbw-table .kbw-frow { height: 31px; }
+.kbw-table .kbw-trow td, .kbw-table .kbw-frow td {
+  padding: 0 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--background-modifier-border);
+  vertical-align: middle;
+}
+/* 数字/日期列与计数胶囊：等宽数字（P7.7c · 顺路收四笔）
+   —— mtime 是「今天 11:02 / 3 天前」，size 是「1.2 KB」；`.kbw-tabnum` 给 schema 的
+   日期类列（propCell 对 kind==='date' 的输出包一层）。
+   ⚠️ 类名是 `kbw-tabnum` 不是 `kbw-num` —— components.css 有个**旧死规则**
+   `.kbw-table td.kbw-num`（monospace，无生产者），别撞名。逐处清单在 redline 那条。 */
+.kbw-table td[data-col='mtime'] { font-variant-numeric: tabular-nums; }
+.kbw-table td[data-col='size'] { font-variant-numeric: tabular-nums; }
+.kbw-tabnum { font-variant-numeric: tabular-nums; }
+.kbw-trow.is-selected,
+.kbw-frow.is-selected { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent); }
+/* 键盘高亮只在键盘真的用过之后才出现（P0 的规矩） */
+.kbw-root.kbw-kbd .kbw-trow.is-cursor { box-shadow: inset 0 0 0 2px var(--interactive-accent); }
+.kbw-trow.is-dimmed { opacity: .55; }
+
+/* 文件夹行（P7.1b · 2.2）：顶部导航行 —— 与网格文件夹格同一套视觉语言
+   （实心主题色文件夹图标 + 计数挂名后；选中底由上面那条组规则给） */
+.kbw-frow { cursor: pointer; }
+.kbw-frow .kbw-frow-ic { color: var(--interactive-accent); flex: none; }
+.kbw-frow .kbw-name { font-weight: 500; }
+.kbw-frow-count { color: var(--text-faint); font-size: var(--fs-1); flex: none; font-variant-numeric: tabular-nums; }
+/* 拖动掠过时的落点高亮（独立审查 🟡3：与网格文件夹格 `.is-folder.is-drop` 同语言；
+   行没有独立边框，环用 inset 阴影画） */
+.kbw-frow.is-drop {
+  background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+}
+
+.kbw-rowcheck { width: 15px; height: 15px; margin: 0; }
+.kbw-table td[data-col='check'] { padding-left: 10px; padding-right: 0; }
+.kbw-namecell { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.kbw-table .kbw-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbw-chips { display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.kbw-chips .kbw-chip { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.kbw-chip.is-small { font-size: var(--fs-1); padding: 1px 6px; border-radius: 8px; }
+.kbw-chip.is-more { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.kbw-dotcell { display: flex; align-items: center; gap: 6px; }
+.kbw-flagcell { display: flex; align-items: center; gap: 3px; }
+.kbw-cell-empty { color: var(--text-faint); }
+.kbw-cell-on { color: var(--text-normal); }
+.kbw-cell-off { color: var(--text-faint); }
+
+/* 就地改名（F2 / 菜单）*/
+.kbw-inline-input {
+  width: 100%;
+  padding: 3px 6px;
+  border-radius: var(--radius-s, 4px);
+  border: 1px solid var(--interactive-accent);
+  background: var(--surface-1);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--fs-3);
+}
+
+/* ── 拖动时跟着指针的小药丸（起手那一帧就归位到触点）────────── */
+.kbw-dragghost {
+  position: fixed;
+  z-index: var(--z-kbw-menu);
+  pointer-events: none;
+  padding: 3px 8px;
+  border-radius: 9px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+  font-size: var(--fs-1);
+  line-height: 1.4;
+  box-shadow: var(--kbw-shadow-2);
+}
+/* 拖动中：别让浏览器选中文字/弹原生菜单 */
+html.kbw-dragging, html.kbw-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none;
+}
+html.kbw-dragging .kbw-trow { cursor: grabbing; }
+
+/* 空态（列表为空时贴着表体上沿，不要占满整屏） */
+.kbw-notes-list .kbw-empty { padding: var(--sp-8) var(--sp-4); }
+
+/* ── 窄容器：目录树收成一条，只留列表 ───────────────────────── */
+.kbw-root[data-w='narrow'] .kbw-notes-side { display: none; }
+/* ⚠️ 中档的 168 **不再在这里写**（P6 段⑥ ④-A）：宽度统一由 `--kbw-col-w` 给
+   （`shell.css` 的 `.kbw-root[data-w='mid']` 那一条）—— 目录栏与顶栏列头槽读同一份，
+   两处各写一个数正是 P6b A🔴2 那条真破绽的来源。 */
+
+/* ══════════════════════════════════════════════════════════════════
+   P6：网格档（交互规格 §3.5；视觉照 `界面设计.html` 的 `s-desk`）
+   刻度直接取自视觉稿：稿子上是 auto-fill minmax(126px)，实现取 **minmax(100px,1fr)**
+   —— §3.2 的硬指标是「每格 ≥100px」，100px 让窄档也能回流换行（真机实测 105–111px）
+   ══════════════════════════════════════════════════════════════════ */
+.kbw-gridwrap { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+/* 排序条（§3.5 的排序下拉 + 自动排列 + 提示）*/
+.kbw-sortbar {
+  flex: none; display: flex; align-items: center; gap: 9px;
+  padding: 7px var(--sp-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--fs-2); color: var(--text-muted);
+}
+.kbw-sortbar .kbw-sp { flex: 1; }
+.kbw-sortbar-lb { color: var(--text-faint); }
+.kbw-sortbar-hint { font-size: var(--fs-1); color: var(--text-faint); }
+.kbw-sortcar { color: var(--interactive-accent); font-size: 10px; margin-left: 2px; }
+/**
+ * 「自动排列」勾选框：**逐行照视觉稿 `.chk`**（`界面设计.html:375–380`）。
+ *
+ * 🔴 容器那三条（`display:flex` / `align-items:center` / `gap:6px`）与 `i` 的 `display:grid`
+ * **同等重要** —— 第一版只搬了 `i` 那半截，于是箱与字按**基线**排、箱右缘直接贴着「自」：
+ * 真机量到「箱中心比文字块中心高 1.8px」「间距 0」（用户点名的那条）。
+ * 判据在探针里（GEOMETRY：箱中心 − 文字块中心 ≤ 1px，且箱右缘到字左缘 ≥ 4px）。
+ *
+ * 触屏的命中面积另在 `styles/mobile.css` 里用 padding + 负 margin 扩（视觉尺寸不变，见 ⑦）。
+ */
+.kbw-chk {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; user-select: none;
+}
+.kbw-chk i {
+  width: 13px; height: 13px; border-radius: 3px;
+  /* ⚠️ 边框色是 `--kbw-nontext`，**不是视觉稿里那个 `--text-faint`**（⑧）：
+     稿子给的是"看起来对"，而框是**控件的本体** —— 真机量到 `--text-faint` 只有 2.3:1（亮）/
+     2.6:1（暗），低于非文字对比的 3:1；框看不见就等于这个开关不存在。见 `tokens.css` 那条。 */
+  border: 1.5px solid var(--kbw-nontext);
+  display: grid; place-items: center; flex: none;
+  transition: background var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
+}
+.kbw-chk.is-on i { background: var(--interactive-accent); border-color: var(--interactive-accent); }
+.kbw-chk.is-on i::after {
+  content: ''; width: 3px; height: 7px;
+  border: solid var(--text-on-accent, #fff); border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-.5px, -1px);
+}
+
+/* 滚动容器：`data-scroll='grid'` 就贴在它身上（键**不蹭** `list`）*/
+.kbw-grid { flex: 1; min-height: 0; overflow: auto; }
+/* 网格体本身 `position: relative` —— 框选矩形是它的绝对定位子元素 */
+.kbw-grid-inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 6px; padding: var(--sp-3);
+  align-content: start;
+}
+.kbw-grid-inner .kbw-empty { grid-column: 1 / -1; }
+
+.kbw-gcell {
+  position: relative;
+  border: 1px solid transparent; border-radius: var(--radius-m);
+  padding: 11px 7px 9px;
+  cursor: pointer; user-select: none;
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
+  /* 让位动画：位置与尺寸都走过渡（`--t-slow` 就是给"拖拽让位"定的那一档）*/
+  transition: background var(--t-base) var(--ease), border-color var(--t-base) var(--ease), transform var(--t-slow) var(--ease);
+}
+/* ⚠️ 顶层 `:hover` 必须就地包进 `@media (hover: hover)`（否则触屏点完残留悬停态）*/
+@media (hover: hover) {
+  .kbw-gcell:hover { background: var(--background-modifier-hover); border-color: var(--background-modifier-border); }
+}
+.kbw-gcell.is-selected {
+  background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+}
+.kbw-root.kbw-kbd .kbw-gcell.is-cursor { box-shadow: inset 0 0 0 2px var(--interactive-accent); }
+.kbw-gcell.is-dimmed { opacity: .55; }
+
+.kbw-gthumb {
+  width: 52px; height: 52px; border-radius: var(--radius-m);
+  background: var(--recessed);
+  display: grid; place-items: center;
+  transition: background var(--t-base) var(--ease);
+}
+.kbw-gthumb svg { width: 24px; height: 24px; color: var(--text-faint); transition: color var(--t-base) var(--ease); }
+.kbw-gcell.is-selected .kbw-gthumb { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent); }
+.kbw-gcell.is-selected .kbw-gthumb svg { color: var(--interactive-accent); }
+
+.kbw-gname {
+  /* ── P7.1b（2.6b）**完整版裁切**：`-webkit-box` + `line-clamp: 2` —— 两行 + 真省略号。
+     ⚠️ 这条纪律注释是**回改过**的（G1-b 单独点头）：c 期那条「不许 -webkit-box」的教训
+     针对的是"**块级子元素**被压扁"（它是 legacy flexbox，子元素都成了可收缩的 flex 项，
+     真机截屏抓到过文字互相重叠）；而 `.kbw-gname` 里**只有纯文本**（`text:` 直写，
+     没有任何元素子节点）→ 用 clamp 安全。批 1 的 `block + max-height` 是"先止血"的
+     临时写法（硬裁、无省略号），已撤。
+     ⇒ **纪律现在的形态**：往 `.kbw-gname` 里**加元素子节点之前**先回读 c 期那笔账
+     （要么改回 max-height 写法、要么先真机量几何），纯文本改名放心。
+     ⚠️ **P7.1c ① 起有一个登记在册的元素子节点**：就地改名的 `<input>` —— 它进格之前
+     `index.ts` 会给本格贴 `is-renaming`，由下面那条规则**当场换回普通块**再进；
+     以后再加别的元素子节点，照这条办（先解 clamp、再进）。 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--fs-2); color: var(--text-normal);
+  text-align: center; line-height: var(--lh-2);
+  max-width: 100%;
+  /**
+   * 🔴 **`break-all`，不是 `break-word`**（P7.0a 批 1②，真机逐字量出来的）：
+   * 长日志名（`日志-20260924-122600-移动`）在 `break-word` 下断成
+   * 「日 / 志-20260924- / 122600-移动」——**第三行被静默裁掉、一个省略号都没有**，
+   * 用户读到的是库里不存在的名字。`break-word`（≈ `overflow-wrap:anywhere`）对
+   * 无空格 ASCII 串不起作用；`break-all` 允许在任意字符处断 → 两行放得下
+   *（`设计建议-P6第九段.md` ② 的矩阵对照：sans-serif 也正常，但那会换字体栈，不取）。
+   * 代价：纯英文长名会在词中断开 —— 文件名场景可接受。
+   * ⚠️ 批 2 上 clamp 之后它**仍然要留**：clamp 负责"两行 + 省略号"，break-all 负责
+   * "长串在哪儿断"——没有它，无空格长串会**溢出到横向被切**（连省略号都没有），
+   * 省略号照样落不到行尾。两者分工，缺一不可（真机几何判据见探针那一步）。
+   */
+  word-break: break-all;
+}
+/**
+ * 网格就地改名（P7.1c ①）：输入框挂在 `.kbw-gname` 里，而上面那条 clamp 是
+ * **legacy flexbox** —— 元素子节点会被压扁（c 期那笔账，`index.ts` 的
+ * `mountRenameInput` 会贴 `is-renaming`）。这条规则把它换回普通块。
+ * ⚠️ 规则里**不出现 `display:-webkit-box`**（红线点名制只放行 `.kbw-gname` 本尊）。
+ */
+.kbw-gname.is-renaming {
+  display: block;
+  overflow: visible;
+}
+.kbw-gsize { font-size: var(--fs-1); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+/* 文件夹格子（B3）：**导航不是笔记** —— 不进选择集、不参与框选/换位（没有 `data-path`）；
+   ⚠️ 但 **P6b ② 起单击 = 选中**（Windows 式），所以它**有** `is-selected` ——
+   靠下面通用那条 `.kbw-gcell.is-selected` 生效（独立审查 A🟡8 指出这条注释与实现相反了）；
+   视觉上用实心文件夹 + 主题色，与纸页图标（`text-faint`）一眼分得开。
+   悬停/掠过时的强调沿用树节点 `.is-drop` 的语言（外圈一圈主题色）。 */
+.kbw-gcell.is-folder .kbw-gthumb {
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--recessed));
+}
+.kbw-gcell.is-folder .kbw-gthumb svg { color: var(--interactive-accent); }
+.kbw-gcell.is-folder .kbw-gname { font-weight: 500; }
+.kbw-gcell.is-folder.is-drop {
+  background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+}
+
+/* 复选框：视觉稿在**右上角**（`.dicon .cb-abs` 的 `top/right: var(--sp-2)`），
+   默认淡出，悬停 / 已选 / 选择模式才现。
+
+   🔴 P7.23（Q7 拍板：**加大命中区、语义不变**）：命中区从 15×15 提到 **29×29** ——
+   视觉小框仍是 15px、落点分毫不动（29−15 的一半 = 7px，从定位里减掉补回去）；
+   框周围那圈留白点下去**也算"点框"**（`grid.ts` 的 click 委托负责翻框 + change）。
+   近失点击因此不再落进格子本体变成"点格 = 替换选择" —— 这是用户报的
+   "勾到两个以后再勾，之前选中的被取消勾选"的语义面（M2）。
+   ⚠️ **不用 padding 撑**：`.kbw-root *` 是 border-box，padding 会从里面吃（P6⑤ 的教训）。
+   ⚠️ `pointer-events` 开关照 `.kbw-gmore` 同款：**没现出来就不吃点击** ——
+   否则触屏上点格子角落会翻到一枚看不见的勾选框。 */
+.kbw-gcell .kbw-gcb {
+  position: absolute;
+  top: calc(var(--sp-2) - 7px); right: calc(var(--sp-2) - 7px);
+  width: 29px; height: 29px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--t-base) var(--ease);
+}
+@media (hover: hover) {
+  .kbw-gcell:hover .kbw-gcb { opacity: 1; pointer-events: auto; }
+}
+.kbw-gcell.is-selected .kbw-gcb, .kbw-gcell.is-selectmode .kbw-gcb { opacity: 1; pointer-events: auto; }
+.kbw-gcb .kbw-rowcheck { width: 15px; height: 15px; margin: 0; display: block; }
+
+/* ⋯：**只在选择模式出现**（触屏没有右键，单篇菜单从这里进 —— §4.2 / 排查报告 #13）*/
+.kbw-gcell .kbw-gmore {
+  position: absolute; top: 2px; left: 2px;
+  width: 24px; height: 24px; padding: 0;
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--t-base) var(--ease);
+}
+.kbw-gcell.is-selectmode .kbw-gmore { opacity: 1; pointer-events: auto; }
+
+/* 拖动中：跟着光标的那一份（单篇）· 被拖的原格 · 空出来的位置 */
+.kbw-gfloat {
+  position: fixed; z-index: var(--z-kbw-menu);
+  pointer-events: none; margin: 0;
+  /* 🔴 **必须掐掉过渡**：克隆体带着 `.kbw-gcell` 的 `transition: transform var(--t-slow)`，
+     而拖动每帧都写 transform（跟手）→ 200ms 的过渡会把浮标拖成"永远落后光标半拍"的橡皮筋
+     （独立审查 F4）。视觉稿要的是"拖动中的图标**跟随**光标"。 */
+  transition: none;
+  background: var(--surface-2, var(--background-primary));
+  border-color: var(--interactive-accent);
+  box-shadow: var(--kbw-shadow-3);
+  transform: scale(1.04);
+  opacity: .92;
+}
+.kbw-gcell.is-dragging { opacity: .35; }
+.kbw-gcell.kbw-gap {
+  border: 1px dashed var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+}
+html.kbw-dragging .kbw-gcell { cursor: grabbing; }
+
+/* 底部状态行（视觉稿 `.fstatus`：「共 N 项 · 框选 M 项」）*/
+.kbw-gstatus {
+  flex: none; display: flex; align-items: center; gap: var(--sp-3);
+  padding: 7px var(--sp-3);
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: var(--fs-1); color: var(--text-faint);
+  /* 「共 12 项 · 框选 3 项」——选中数变的时候整行不许抖（P7.7c · 顺路收四笔） */
+  font-variant-numeric: tabular-nums;
+}
+.kbw-gstatus .kbw-sp { flex: 1; }
+.kbw-gstatus-tail { color: var(--text-muted); }
+
+/* ── 首入「全部笔记」的一次性讲解浮层（`ui/notes-intro.ts` · P7.10 · #8）──
+   浮层本体是通用 `.kbw-panel`（拖头 / Esc 都是它那套）；这里只管卡片自己的宽度与两段内容。 */
+.kbw-noteintro {
+  width: min(420px, 92vw);
+}
+.kbw-noteintro-list {
+  margin: 0 0 var(--sp-2);
+  padding-left: 1.3em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--fs-2);
+  color: var(--text-normal);
+  line-height: var(--lh-2);
+  /* `white-space` 是继承属性 —— 折行容器显式写回（P6③ 那条） */
+  white-space: normal;
+}
+.kbw-noteintro-tip {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  white-space: normal;
+}
+
+/* 框选矩形：**复用看板那一份 `.kbw-marquee`**（`styles/board.css`，挂在 body 上、
+   `position: fixed`）。同一件事不写第二遍样式 —— 两处各写一份迟早漂。*/

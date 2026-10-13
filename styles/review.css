@@ -1,0 +1,160 @@
+/* ══════════════════════════════════════════════════════════════════
+   P8：回顾（面板形态照「全部笔记」那一栏 —— 交互规格.md §3）
+   ══════════════════════════════════════════════════════════════════
+
+   期 1 骨架只要外壳：撑满高度 + 纵向排列，把 `.kbw-empty`（它自带 `flex: 1` 居中）
+   放进来就是一屏居中的空态。面板三块（今日待复习 / 全部卡片 / 从笔记生成）
+   到期 2 再往这儿加，别提前长。 */
+
+.kbw-review { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+/* ── 期 2：面板（卡片列表 / 头部计数 / 确认流里的只读预览）────────────────
+   ⚠️ 一律走主题变量（`--sp-*` / `--fs-*` / `--text-*` / `--background-modifier-*`），
+   不写死颜色 —— 明暗两主题都要能看（P6⑤ 那条非文字对比的口径）。 */
+
+.kbw-review-head {
+  flex: none;
+  display: flex;
+  /* 窄栏下五个元素（标题 / 到期 / 开始复习 / 档位 / 库内路径）要能换行，别互挤 */
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.kbw-review-title { font-size: var(--fs-4); color: var(--text-normal); }
+.kbw-review-due { font-size: var(--fs-2); color: var(--text-faint); }
+.kbw-review-due.is-due { color: var(--interactive-accent); }
+/* 「库内文件：…」——它是用户能自己打开/备份/手改的文件，明写在屏上 */
+.kbw-review-path { margin-left: auto; font-size: var(--fs-1); color: var(--text-faint); }
+
+.kbw-review-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.kbw-review-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+/* ⚠️ 顶层 :hover 必须包进 @media (hover: hover)（platform-pitfalls #36：触屏点完会留悬停态） */
+@media (hover: hover) {
+  .kbw-review-row:hover { background: var(--background-modifier-hover); }
+}
+.kbw-review-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.kbw-review-q { font-size: var(--fs-3); color: var(--text-normal); }
+/* 背面：两行封顶（管理列表里不看全文；复习时才是逐张翻面） */
+.kbw-review-a {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.kbw-review-row-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+/* 来源笔记：一个可点的小胶囊（点开那一篇） */
+.kbw-review-src {
+  font-size: var(--fs-1);
+  color: var(--text-muted);
+  background: var(--background-modifier-hover);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 2px var(--sp-2);
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-review-src.is-missing { color: var(--text-warning); border-style: dashed; }
+
+/* 确认流里的只读预览（`ConfirmSpec.attach` 的唯一用途：正反面给人过一眼） */
+.kbw-review-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+.kbw-review-preview-row { display: flex; gap: var(--sp-2); align-items: baseline; }
+.kbw-review-preview-tag { flex: none; color: var(--text-faint); font-size: var(--fs-1); }
+.kbw-review-preview-txt { flex: 1; min-width: 0; color: var(--text-normal); font-size: var(--fs-2); white-space: pre-wrap; }
+
+/* 文件读不动那一行（只读提示；不画空态、不给动作 —— 写是被拒的） */
+.kbw-review-broken {
+  margin: var(--sp-4);
+  padding: var(--sp-3);
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  color: var(--text-warning);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+}
+
+/* 对话框里的两栏（textarea 版的 kbw-input：可纵向拉，别横拉） */
+.kbw-review-input { width: 100%; resize: vertical; }
+
+/* ── 期 3：今日筛选 / 开始复习 / 复习浮层 ──────────────────────────── */
+
+.kbw-review-start { margin-left: var(--sp-2); }
+.kbw-review-scope { margin-left: var(--sp-3); }
+/* 「全部」档里每张卡的下次到期（「今日」档不画 —— 那儿全是到期的） */
+.kbw-review-when { flex: none; font-size: var(--fs-1); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.kbw-review-when.is-due { color: var(--interactive-accent); }
+/* 「今日」档但今天没到期：一句话 + 一个出口（**不是空态** —— 卡没丢） */
+.kbw-review-today-empty { padding: var(--sp-6) var(--sp-4); color: var(--text-faint); font-size: var(--fs-2); }
+.kbw-review-today-act { padding: 0 var(--sp-4) var(--sp-4); }
+
+/* ── 复习浮层（`.kbw-review-session` 挂在模态根上）────────────────────
+   一屏一张：进度 → 卡面（点一下翻面）→ 提示 → 三键。字号比正文大 —— 这是"读"的界面。 */
+.kbw-review-session .kbw-modal-body { display: flex; flex-direction: column; gap: var(--sp-3); }
+.kbw-rs-progress { color: var(--text-faint); font-size: var(--fs-2); font-variant-numeric: tabular-nums; }
+.kbw-rs-face {
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6) var(--sp-4);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: var(--fs-6);
+  line-height: var(--lh-3);
+  text-align: center;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+/* 背面：换个底 + 稍小的字（一眼能看出"翻过来了"） */
+.kbw-rs-face.is-back { background: var(--background-primary); font-size: var(--fs-4); }
+.kbw-rs-hint { color: var(--text-faint); font-size: var(--fs-2); }
+.kbw-rs-actions { display: flex; gap: var(--sp-2); justify-content: center; }
+
+/* ── 期 4：AI 出稿面板（可改可删）────────────────────────────────── */
+.kbw-gen-list { display: flex; flex-direction: column; gap: var(--sp-3); max-height: 52vh; overflow-y: auto; }
+.kbw-gen-trunc { color: var(--text-faint); font-size: var(--fs-1); }
+.kbw-gen-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.kbw-gen-field { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.kbw-gen-tag { color: var(--text-faint); font-size: var(--fs-1); }
+.kbw-gen-del { flex: none; }
+.kbw-review-gen { margin-left: var(--sp-2); }

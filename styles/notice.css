@@ -1,0 +1,177 @@
+/* ══════════════════════════════════════════════════════════════════
+   notice · 通知与反馈（交互规格 §1.3：落点 = **顶部**）
+   自建栈：平台 Notice 没有动作按钮，也不在顶部 → 自己来，样式全走主题变量
+   ══════════════════════════════════════════════════════════════════ */
+.kbw-notices {
+  position: fixed;
+  /* 兜底值；真实落点由 JS 按当前视图头的下沿算（见 ui/notify.ts）——
+     固定的 top 会压住标签页与视图标题 */
+  top: var(--sp-3);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-kbw-notice);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  pointer-events: none;   /* 容器不挡点击，逐条自己开 */
+  max-width: min(560px, calc(100vw - 24px));
+}
+
+@keyframes kbw-notice-in {
+  from { opacity: 0; transform: translateY(-8px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes kbw-notice-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-6px); }
+}
+.kbw-notice {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-width: 240px;
+  padding: 10px var(--sp-3);
+  border-radius: var(--radius-m, 8px);
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--kbw-notice-bg);
+  box-shadow: var(--kbw-notice-shadow);
+  font-size: var(--fs-3);
+  color: var(--kbw-notice-fg);
+  animation: kbw-notice-in var(--t-fast) var(--ease-enter);
+}
+.kbw-notice.is-leaving { animation: kbw-notice-out var(--t-fast) var(--ease-exit) forwards; }
+.kbw-notice-bar {
+  flex: none;
+  width: 3px;
+  align-self: stretch;
+  border-radius: 2px;
+  background: var(--text-faint);
+  margin-top: 1px;
+}
+.kbw-notice.is-success .kbw-notice-bar { background: var(--color-green); }
+.kbw-notice.is-partial .kbw-notice-bar { background: var(--color-yellow); }
+.kbw-notice.is-error .kbw-notice-bar { background: var(--color-red); }
+.kbw-notice.is-info .kbw-notice-bar { background: var(--color-blue); }
+.kbw-notice-body { flex: 1; min-width: 0; }
+.kbw-notice-text { line-height: var(--lh-2); }
+.kbw-notice-detail {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: var(--lh-2);
+  /* 多行明细（P7.9 · ⑤ 的"原因与去处"逐行列）—— 单行明细不受影响 */
+  white-space: pre-line;
+}
+.kbw-notice-actions { display: flex; gap: var(--sp-1); margin-top: 6px; }
+.kbw-notice-actions button {
+  font-size: var(--fs-2);
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: var(--radius-s, 4px);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  background: var(--surface-1);
+}
+@media (hover: hover) {
+  .kbw-notice-actions button:hover { background: var(--background-modifier-hover); border-color: var(--background-modifier-border-hover); }
+}
+.kbw-notice-close {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-s, 4px);
+  color: var(--text-faint);
+  font-size: var(--fs-3);
+  line-height: 1;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   撤销条（交互规格 §10.1）—— 与通知栈同一族：挂 body、fixed 在底部
+   存活 5 秒；「撤销」= **从操作前的快照还原**（不是逆运算）
+   ══════════════════════════════════════════════════════════════════ */
+.kbw-undobar-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--sp-4);
+  z-index: var(--z-kbw-notice);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.kbw-undobar {
+  position: relative;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 300px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: var(--sp-2) var(--sp-3) calc(var(--sp-2) + 2px);
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--kbw-notice-bg);
+  color: var(--kbw-notice-fg);
+  box-shadow: var(--kbw-notice-shadow);
+  overflow: hidden;
+  animation: kbw-undo-in var(--t-base) var(--ease-enter);
+}
+@keyframes kbw-undo-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.kbw-undobar.is-leaving { animation: kbw-undo-out var(--t-base) var(--ease-exit) forwards; }
+@keyframes kbw-undo-out { to { opacity: 0; transform: translateY(12px); } }
+.kbw-undobar-body { flex: 1; min-width: 0; }
+.kbw-undobar-text { font-size: var(--fs-3); }
+.kbw-undobar-detail {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-undobar-actions { display: flex; align-items: center; gap: var(--sp-1); flex: none; }
+.kbw-undobar-close {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-s, 4px);
+  color: var(--text-faint);
+  font-size: var(--fs-3);
+  line-height: 1;
+}
+/* 倒计时进度：宽度推进就是"还剩多久"；悬停暂停（准备点的时候别消失）*/
+.kbw-undobar-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--interactive-accent);
+  transform-origin: left center;
+  animation: kbw-undo-countdown var(--kbw-undo-ms, 5000ms) linear forwards;
+}
+.kbw-undobar-progress.is-paused { animation-play-state: paused; }
+/**
+ * **「减少动效」豁免（P7.7 · 10.1 拍板）**：倒计时条是**功能性进度指示**（条长 = 还剩多少
+ * 撤销时间），不是装饰动效 —— 按普通规则压 1ms 会瞬间变空条，看起来像"已过期"却还能点，
+ * 是谎报。所以它在两段减少动效规则（base.css 的媒体段 · settings.css 的 `data-motion` 段）
+ * 之外**保留线性倒计时**；撤销条其余进出场照常降级为瞬时。
+ *
+ * 🔴 **特异性账要算对**（第一版就在这儿栽了，真机探针当场红）：
+ * settings 段最高 `body[data-motion='reduce'] :is(.kbw-menu, …, .kbw-undobar-wrap *)` 的真实
+ * 特异度是 **(0,2,1)**（`body` 是**元素**不是类！）—— 只写三截
+ * `body .kbw-undobar-wrap .kbw-undobar-progress` 也是 (0,2,1)，**打平后按源序**：
+ * settings.css 在 STYLE_ORDER 里靠后 → 它赢 → 豁免失效。
+ * 所以这里把 `.kbw-undobar` 也写进链条：`body .A .B .C` = **(0,3,1) > (0,2,1)**，与源序无关。
+ * （媒体段那条约 (0,1,0)，本来就压得住。）改这里之前先重算一遍特异度。
+ */
+body .kbw-undobar-wrap .kbw-undobar .kbw-undobar-progress {
+  animation-duration: var(--kbw-undo-ms, 5000ms) !important;
+}
+@keyframes kbw-undo-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }

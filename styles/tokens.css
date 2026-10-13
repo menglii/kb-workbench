@@ -1,0 +1,120 @@
+/* ══════════════════════════════════════════════════════════════════
+   刻度与深度 · tokens
+   ──────────────────────────────────────────────────────────────────
+   归我们的：间距 / 字阶 / 深度层级 / 动效 / 语义色「含义」
+   归主题的：所有**色值**（一律走 Obsidian CSS 变量，零硬编码色）—— 方案设计.md §5.1
+
+   ⚠️⚠️ **主题变量的别名必须挂在 `body` 上，绝不能挂 `:root`** ⚠️⚠️
+   Obsidian 把 `--background-primary` / `--shadow-*` 定义在 **`body`** 上
+   （从 `obsidian.asar` 取证：全文只有一处定义，选择器就是 `body`）。
+   挂在 `:root` 上的话，`var(--background-primary)` 在 `:root` 那一层就解析失败，
+   `--surface-*` 变成**无效值**，用到它的元素 `background` / `box-shadow` 全部变 unset
+   —— 症状是菜单、模态、卡片**一起透明且没有阴影**，文字糊在内容上看不清。
+   （P0 真机第一轮就撞上了这条，离线测试验不出：jsdom 不做变量解析，测试也只查样式源。）
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── 间距 · 8 档（决策 24）每档只有一个用途 ── */
+  --sp-1: 4px;   /* 图标与文字之间的缝 */
+  --sp-2: 8px;   /* 触控目标最小间距 · 胶囊内边距 */
+  --sp-3: 12px;  /* 卡片内边距 · 卡片间距 */
+  --sp-4: 16px;  /* 区块内边距 */
+  --sp-5: 20px;  /* 模块边距 */
+  --sp-6: 24px;  /* 模块顶部留白 */
+  --sp-7: 32px;  /* 板块间距 */
+  --sp-8: 48px;  /* 空态留白 */
+
+  /* ── 字阶 · 6 档（决策 24）── */
+  --fs-1: 11px;    /* 微标签：属性名 · 计数 · 时间戳 */
+  --fs-2: 12.5px;  /* 辅助：meta · 描述 · 表格次要列 */
+  --fs-3: 14px;    /* 正文基准：表格 · 段落 */
+  --fs-4: 16px;    /* 强调正文：待处理标题 · 卡片标题 */
+  --fs-5: 20px;    /* 区块标题：模块标题 */
+  --fs-6: 26px;    /* 展示：品牌名 */
+
+  /* ── 行高（与字阶配对，不单独使用）── */
+  --lh-1: 1.35;
+  --lh-2: 1.45;
+  --lh-3: 1.6;
+
+  /* ── 动效（决策 28–30 · 方案设计.md §5.7；P7.7 · 10.1 分档）──
+     曲线三档 + 循环一枚，**不许散写毫秒/曲线**（每条动效的账在 方案设计.md §5.7）：
+       进入 --ease-enter ｜ 离开 --ease-exit ｜ 标准 --ease ｜ 循环 --ease-loop
+     ⚠️ exit 是"慢起快走"（加速），退场别让用户盯着空等；
+        enter 与标准现为同曲线（零回归），分开命名是为了以后各自能调、互不牵连。 */
+  --t-fast: 120ms;  /* 确认流淡入 · 模块切换 */
+  --t-base: 150ms;  /* 面板展开 · 菜单 */
+  --t-slow: 200ms;  /* 拖拽让位 */
+  --t-flash: 600ms; /* 「我在这里」光晕（一次性强调） */
+  --t-breathe: 1.2s; /* AI 步骤进行中（循环） */
+  --t-shimmer: 1.4s; /* 骨架屏（循环） */
+  --ease-enter: cubic-bezier(.2, .8, .3, 1); /* 进入：快起慢收 */
+  --ease-exit: cubic-bezier(.4, 0, 1, 1);    /* 离开：慢起快走 */
+  --ease: cubic-bezier(.2, .8, .3, 1);       /* 标准：hover / 选中 / 让位 */
+  --ease-loop: ease-in-out;                  /* 循环：两端平滑，防每圈起跳 */
+
+  /* ── 我们自己的层叠（不抢 Obsidian 模态的层）── */
+  --z-kbw-panel: 45;
+  --z-kbw-menu: 50;
+  --z-kbw-notice: 55;
+
+  /* ── 触控目标（方案设计.md §5.8 ②）── */
+  --kbw-touch: 44px;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   以下是**主题变量的别名** —— 必须在 body 上（见文件头的说明）
+   ──────────────────────────────────────────────────────────────── */
+body {
+  /* 深度 · 5 层（决策 25）：色值全部继承主题，这里只固定"谁用哪一层" */
+  --surface-0: var(--background-secondary);   /* 工作台底 / 导航 */
+  --surface-1: var(--background-primary);     /* 主内容面 */
+  --surface-2: var(--background-primary);     /* 卡片 / 面板（+边框+轻阴影）*/
+  --surface-3: var(--background-primary);     /* 浮层（+边框+重阴影）*/
+  --recessed: var(--background-secondary);    /* 凹陷：输入框 / 缩略图底 / 代码 */
+
+  --kbw-shadow-2: var(--shadow-s, 0 1px 2px rgba(0, 0, 0, .12));
+  --kbw-shadow-3: var(--shadow-l, 0 6px 24px rgba(0, 0, 0, .24));
+
+  /* 拉杆（§7.4）的几何：**圆点直径 = 轨道盒高度 = 输入框高度**，细横杆用渐变画在里面居中。
+     三个数相等是"圆心必然落在横杆中线"的**构造性**保证（P4.5 §1.3：平台给圆点钉了
+     `position:relative; top: var(--slider-thumb-y)` = -6px —— 那是配它的 18px 圆点 + 6px 轨道的，
+     我们只改宽高时那 -6px 会留下来把 12px 圆点顶上去。详见 components.css 那段）。
+     微调这两个值 = 微调拉杆手感，别在别处再写死像素。 */
+  --kbw-range-dot: 12px;
+  --kbw-range-bar: 4px;
+
+  /**
+   * ⑧ **非文字对比**（WCAG 1.4.11 Non-text Contrast，要求 ≥3:1）：
+   * **边框 / 图标 / 必须看得见的线**用这一档，别用 `--text-faint`。
+   *
+   * 为什么要有它（2026-09-28 真机逐条量过，两个主题都量）：
+   * ```
+   *                   --text-faint 实测        这一档（text-faint 往 text-normal 靠 40%）
+   *   亮色（moonstone）  勾选框 2.30:1 ✗          勾选框 ≈4.2:1 ✓ ｜ 树三角 2.12 → ≈3.9 ✓
+   *   暗色（obsidian）   树三角 2.57:1 ✗          同样 ≈4.9:1 ✓
+   * ```
+   * `--text-faint` 是平台给**次要文字**用的（我们照用没有错），但拿它画"一个必须看得见的方框"
+   * 就不够了 —— 尤其勾选框：框看不见等于控件消失。
+   * ⚠️ 用 `color-mix` 而不是另一个写死的灰：主题一换它自己跟着走（本项目零硬编码色那条）。
+   * ⚠️ 判据在探针里（真机算 `对比度 ≥ 3:1`，明暗各一次 + 收尾切回原主题）——
+   * 别在离线里"查一下用了哪个变量"就算验过（那是自证）。
+   */
+  --kbw-nontext: color-mix(in srgb, var(--text-faint) 60%, var(--text-normal));
+
+  /* 弹层优先用**平台自己的变量** —— 主题改过它们，我们跟着变，
+     外观与原生菜单/模态一致（值取自 obsidian.asar 里原生规则的用法） */
+  --kbw-menu-bg: var(--menu-background, var(--background-secondary));
+  --kbw-menu-border: var(--menu-border-color, var(--background-modifier-border));
+  --kbw-menu-radius: var(--menu-radius, var(--radius-m, 8px));
+  --kbw-menu-shadow: var(--menu-shadow, var(--kbw-shadow-3));
+  --kbw-modal-bg: var(--modal-background, var(--background-primary));
+  --kbw-modal-border: var(--modal-border-color, var(--background-modifier-border));
+  --kbw-modal-radius: var(--modal-radius, var(--radius-l, 16px));
+  /* ⚠️ 通知底**不要**用 `--background-modifier-message` —— 真机量过：
+     亮色主题下它是 `color-mix(in oklch, black 90%, transparent)`（90% 黑），
+     那是给平台**深色 toast** 配浅色文字用的；我们配的是深色正文 → 黑底黑字。
+     用 surface-3（= background-primary）当卡片底，两种主题都可读 */
+  --kbw-notice-bg: var(--background-primary);
+  --kbw-notice-fg: var(--text-normal);
+  --kbw-notice-shadow: 0 2px 8px var(--background-modifier-box-shadow, rgba(0, 0, 0, .3));
+}

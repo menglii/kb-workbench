@@ -1,0 +1,132 @@
+/* ══════════════════════════════════════════════════════════════════
+   base · 复位与三条触屏铁律
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 作用域统一挂 .kbw —— 只碰我们自己的元素，不改 Obsidian 原生外观 */
+.kbw-root {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-interface);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  color: var(--text-normal);
+  background: var(--surface-0);
+  -webkit-font-smoothing: antialiased;
+}
+
+.kbw-root *,
+.kbw-menu *,
+.kbw-panel *,
+.kbw-modal *,
+.kbw-notices * {
+  box-sizing: border-box;
+}
+
+.kbw-root button,
+.kbw-menu button,
+.kbw-panel button,
+.kbw-modal button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  /* ⚠️ 平台的 `button` 样式用 `box-shadow: inset 0 0 0 1px …` 当边框、
+     用半透明底当填充 —— 只清 border/background 拦不住，会看到一圈"虚线环"
+     （真机截图比对才发现的）*/
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* ── 铁律 1：顶层 :hover 一律就地包进 @media (hover: hover) ────────
+   靠「让规则不加载」解决触屏点完残留悬停态；补复位名单是追不完的。
+   （platform-pitfalls #36 / 排查报告 §四）                        */
+@media (hover: hover) {
+  .kbw-hover-1:hover {           /* L1 行 / 卡片：只变背景 */
+    background: var(--background-modifier-hover);
+  }
+  .kbw-hover-2:hover {           /* L2 图标按钮：背景 + 图标色 */
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+  .kbw-hover-3:hover {           /* L3 可拖拽块：背景 + 边框 */
+    background: var(--background-modifier-hover);
+    border-color: var(--background-modifier-border-hover);
+  }
+}
+
+/* ── 铁律 2：触屏 :active 只改颜色，不改尺寸/位移 ─────────────────
+   （platform-pitfalls #36：改尺寸会让卡片点一下跳一下）            */
+.kbw-root button:active,
+.kbw-menu button:active,
+.kbw-panel button:active {
+  background: var(--background-modifier-active);
+}
+
+/* ── 铁律 3：长按抑制三层（交互规格 §3.5）─────────────────────────
+   安卓/浏览器自己的长按菜单 ~500ms 弹出，会把 400ms 的手势抢走。
+   只在触屏（body.is-mobile）开，桌面上的文字选择要留着。           */
+body.is-mobile .kbw-root .kbw-pressable,
+body.is-mobile .kbw-root .kbw-pressable * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 键盘高亮只在键盘真的用过之后才出现（方案设计.md §4.4）：
+   全程用鼠标 → 界面上不出现任何新样式 */
+.kbw-root.kbw-kbd :focus-visible,
+.kbw-root.kbw-kbd :focus {
+  outline: none;
+}
+.kbw-root.kbw-kbd :focus-visible {
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+  border-radius: var(--radius-s, 4px);
+}
+
+/* 减少动效（方案设计.md §5.7 · P7.7 收口）
+   ────────────────────────────────────────────────────────────────
+   口径：把时长压到 1ms（不是 0 —— 等 transitionend/animationend 的代码另有兜底定时器，
+   见 notify.ts / undo-bar.ts）；"到点消失型"的动效（闪一下）**不靠这里**，那条走 JS 判 +
+   静态形态（board.css 的 .kbw-panel-flash）。
+   ⚠️ **容器本体也要点名**：`.kbw-menu *` 只后代——菜单/浮层/模态的**出场动画挂在元素本体**
+   （.kbw-menu / .kbw-panel / .kbw-modal 自己的 kbw-pop），漏了它们等于"减少动效下菜单照弹"。
+   ⚠️ `.kbw-undobar-wrap` 挂在 body 上（撤销条），不在任何祖先类下面，必须单独点名
+   —— 曾经就是漏的（P7.7 盘点挖出）。**加/改容器时，这里和 settings.css 那段一起改。** */
+@media (prefers-reduced-motion: reduce) {
+  :is(.kbw-root, .kbw-menu, .kbw-panel, .kbw-modal, .kbw-notices, .kbw-undobar-wrap) *,
+  :is(.kbw-root, .kbw-menu, .kbw-panel, .kbw-modal, .kbw-notices, .kbw-undobar-wrap) *::before,
+  :is(.kbw-root, .kbw-menu, .kbw-panel, .kbw-modal, .kbw-notices, .kbw-undobar-wrap) *::after,
+  .kbw-menu, .kbw-panel, .kbw-modal, .kbw-backdrop, .kbw-notices, .kbw-undobar-wrap {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* 滚动条：数据区要密，不能胖 */
+.kbw-root ::-webkit-scrollbar { width: 8px; height: 8px; }
+.kbw-root ::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border);
+  border-radius: 4px;
+}
+.kbw-root ::-webkit-scrollbar-track { background: transparent; }
+@media (hover: hover) {
+  .kbw-root ::-webkit-scrollbar-thumb:hover { background: var(--background-modifier-border-hover); }
+}
+
+/* 通用视觉原子 */
+.kbw-mono { font-family: var(--font-monospace); font-size: var(--fs-2); }
+.kbw-muted { color: var(--text-muted); }
+.kbw-faint { color: var(--text-faint); }
+.kbw-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ⚠️ 3 行裁切**不要**用 `display:-webkit-box` + `-webkit-line-clamp`（legacy flexbox 会把
+   块级子元素**压扁**而不是裁掉 → 文字互相重叠，看板卡片 2026-09-25 真机踩过）。
+   统一改用「行数 × 行高」的高度上限；代价是没有「…」省略号。 */
+.kbw-clamp-3 {
+  display: block;
+  max-height: calc(var(--lh-2) * 3 * 1em);
+  overflow: hidden;
+}
+.kbw-sep { height: 1px; background: var(--background-modifier-border); margin: var(--sp-1) 0; }

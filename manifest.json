@@ -1,0 +1,9 @@
+{
+  "id": "kb-workbench",
+  "name": "经纬",
+  "version": "0.1.0",
+  "minAppVersion": "1.13.0",
+  "description": "知识工作台：把知识库当数据库——全库笔记在一张表里看得见、选得中、批量动得了，任何动库操作都能一键还原。",
+  "author": "Mengligaga",
+  "isDesktopOnly": false
+}

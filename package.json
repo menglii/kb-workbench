@@ -1,0 +1,36 @@
+{
+  "name": "kb-workbench",
+  "version": "0.1.0",
+  "description": "经纬 · 知识工作台（Obsidian 插件）",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/test.mjs",
+    "test:shards": "node scripts/test-shards.mjs",
+    "check": "npm run typecheck && npm test",
+    "probe": "node scripts/probe.mjs",
+    "lint:probe": "node scripts/probe-lint.mjs",
+    "last-green": "node scripts/last-green.mjs",
+    "peek": "node scripts/peek.mjs",
+    "probe:launch": "node scripts/probe-launch.mjs",
+    "reload": "node scripts/reload.mjs",
+    "sandbox": "npm run build && node scripts/deploy.mjs && node scripts/reload.mjs",
+    "deploy:sandbox": "npm run build && node scripts/deploy.mjs",
+    "deploy:real": "node scripts/deploy.mjs --real",
+    "pack:share": "node scripts/make-share-pack.mjs",
+    "pack:contest": "node scripts/make-contest-pack.mjs",
+    "demo:vault": "node scripts/make-demo-vault.mjs",
+    "shoot:wizard": "node scripts/shoot-wizard.mjs",
+    "obsidian": "node scripts/obsidian.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.28.0",
+    "jsdom": "^30.0.0",
+    "obsidian": "^1.13.0",
+    "typescript": "^5.9.0"
+  }
+}
