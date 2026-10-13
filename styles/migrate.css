@@ -1,0 +1,177 @@
+/* ══ 属性迁移面板（P2） ══ */
+/* 一屏里要放"每篇要改什么 + 逐篇的选择"，所以行是**纵向堆叠**的：
+   名称 / 改动 chip / 待你定的下拉。列表自己滚，底部按钮条常驻。 */
+
+.kbw-mig-head {
+  padding: 0 var(--sp-1) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kbw-mig-count {
+  font-size: var(--fs-4);
+  color: var(--text-normal);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kbw-mig-sub {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+}
+
+.kbw-mig-last {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+}
+
+.kbw-mig-last.is-hidden {
+  display: none;
+}
+
+.kbw-mig-list {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  overflow: auto;
+  max-height: 46vh;
+}
+
+.kbw-mig-row {
+  padding: var(--sp-3);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.kbw-mig-row:first-child {
+  border-top: none;
+}
+
+.kbw-mig-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.kbw-mig-name-t {
+  font-size: var(--fs-3);
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.kbw-mig-path {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kbw-mig-ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.kbw-mig-op {
+  font-size: var(--fs-1);
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--recessed);
+  /* 语义不靠颜色：删项前缀就是「删」，改项写成 `键：旧 → 新`（色盲可达） */
+  color: var(--text-normal);
+}
+
+.kbw-mig-op.is-del {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.kbw-mig-op.is-none {
+  color: var(--text-faint);
+  background: transparent;
+  padding-left: 0;
+}
+
+.kbw-mig-field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.kbw-mig-label {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  min-width: 44px;
+}
+
+.kbw-mig-why {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+}
+
+.kbw-mig-diff {
+  font-size: var(--fs-1);
+  color: var(--text-muted);
+}
+
+.kbw-mig-keep {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  margin-top: var(--sp-1);
+}
+
+.kbw-mig-rest {
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+}
+
+.kbw-mig-empty {
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+  font-size: var(--fs-3);
+  color: var(--text-muted);
+}
+
+.kbw-mig-row.is-blocked {
+  background: var(--recessed);
+}
+
+.kbw-mig-row.is-blocked .kbw-mig-name-t {
+  color: var(--text-muted);
+}
+
+/* ── 分档区（P7.17 · 合并矩阵）──
+   覆盖区（is-cover）：逐篇勾选行；其余分档（is-skip）沿用 is-blocked 的安静底。 */
+.kbw-mig-row.is-skip {
+  background: var(--recessed);
+}
+.kbw-mig-row.is-skip .kbw-mig-name-t {
+  color: var(--text-muted);
+}
+/* ⚠️ P7.18 起这条规则**两个语义类共用**（选择器组，不是抄第二份）：
+   · `.kbw-mig-cover` = 补全面板的「覆盖区」逐篇勾选行；
+   · `.kbw-clean-pick` = 退出清理面板的逐项勾选行（键 / 足迹同款）。 */
+.kbw-mig-cover,
+.kbw-clean-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-1);
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: var(--recessed);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+/* 退出清理：勾选行里那个目标名（比详情的灰字重一档） */
+.kbw-clean-label {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.kbw-mig-check {
+  margin: 0;
+}

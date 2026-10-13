@@ -1,0 +1,564 @@
+/* ══════════════════════════════════════════════════════════════════
+   components · 基础控件
+   平台没有多选控件（property 也是单选）→ 多选必须自研（.kbw-multiselect）
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 按钮 ───────────────────────────────────────────────────── */
+.kbw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--fs-3);
+  line-height: 1;
+  padding: 9px 15px;
+  border-radius: var(--radius-s, 4px);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--surface-1);
+  color: var(--text-normal);
+  /* ⚠️ `color` 也要过渡（P7.7c 独立审 🟢5）：危险按钮两态的字色不同（红字 ↔ 白字），
+     不过渡的话 hover/上膛瞬间先"白字压淡红"闪一下 —— 底色在 150ms 里走、字色瞬变。 */
+  transition: background var(--t-base) var(--ease), border-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
+  white-space: nowrap;
+}
+.kbw-btn.is-primary {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+  font-weight: 600;
+}
+/**
+ * 危险按钮（P7.7c · 10.6，拍板「淡底 + 红字」）：常态是**淡底红字**，
+ * 实心红只留给 **hover / 上膛（`.is-armed`）那一下的强调**。
+ * 改前是"实心红 + 白字"：暗色实测 3.45:1 不合格（P6⑤ 记的账，见 `confirm.css` 上膛段）。
+ *
+ * ⚠️ **字色是 `--color-red` 与 `--text-normal` 的自适应混合（80/20），不是裸 `var(--color-red)`**：
+ * 裸红字实测够不到常态判据（≥4.5:1）—— 亮色 `#e93147` 压 12% 淡底只有 ~3.9:1、
+ * 暗色 `#fb464c` ~4.2:1（Obsidian 默认色板的红本身就压线，再叠淡底只会更低）。
+ * 混合让**亮色自动加深、暗色自动提亮**，一行吃两主题（2026-10-05 拍板，真机探针实测确认）。
+ * 悬停/上膛时白字压实心红的对比度**低于常态**是有意为之（那一瞬是强调态、非阅读态），
+ * 拍板接受；真机探针把两个态的实测数都写进判据 info，别当回归。
+ */
+.kbw-btn.is-danger {
+  background: color-mix(in srgb, var(--color-red) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-red) 30%, transparent);
+  color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal));
+  font-weight: 600;
+}
+.kbw-btn.is-danger.is-armed {
+  background: var(--color-red);
+  border-color: var(--color-red);
+  color: var(--text-on-accent, #fff);
+}
+.kbw-btn.is-ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+.kbw-btn.is-small { font-size: var(--fs-2); padding: 6px 10px; }
+/**
+ * **`is-hidden` = 真的藏起来**（`classList.toggle('is-hidden', …)` 的落点）。
+ *
+ * 🔴 独立审查 A🟡 抓到的：全仓**没有** `.is-hidden` 的通用规则 —— 只有
+ * `.kbw-mig-last.is-hidden`（`migrate.css`）与 `.kbw-card.is-hidden`（`board.css`，**那是"淡出"不是"藏"**）。
+ * 于是 `classList.toggle('is-hidden', …)` 那几处**静默什么都不做**：
+ *   · `ui/migrate-panel.ts` 的「全部用推荐值」——**从 P2 起就没藏住过**；
+ *   · `ui/wizard.ts` 最后一步的「跳过这一步」——本来该收起来。
+ * **按钮看着在、点了没反应**正是本项目最烦的形态，而它的成因只是少了一条 CSS。
+ *
+ * ⚠️ **只给按钮加，别写成全局 `.is-hidden { display:none }`**：那样会连
+ * `.kbw-card.is-hidden` 一起命中 —— 卡片那条是"淡出可辨认"，全局藏起来会把
+ * 「查看隐藏的文件」整块功能弄没（两条规则设的是**不同属性**，特异性压不住）。
+ */
+.kbw-btn.is-hidden { display: none; }
+.kbw-btn[disabled],
+.kbw-btn.is-disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+@media (hover: hover) {
+  .kbw-btn:hover { background: var(--background-modifier-hover); border-color: var(--background-modifier-border-hover); }
+  .kbw-btn.is-primary:hover { background: var(--interactive-accent-hover, var(--interactive-accent)); border-color: var(--interactive-accent-hover, var(--interactive-accent)); }
+  .kbw-btn.is-danger:hover {
+    background: var(--color-red);
+    border-color: var(--color-red);
+    color: var(--text-on-accent, #fff);
+  }
+  .kbw-btn.is-ghost:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+}
+
+/* ── 图标按钮（L2 悬停：背景 + 图标色）───────────────────────── */
+.kbw-iconbtn {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-s, 4px);
+  color: var(--text-muted);
+  transition: background var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+.kbw-iconbtn.is-small { width: 24px; height: 24px; }
+
+/* ── 状态胶囊：色块 + 文字（不单靠颜色，色盲可达）────────────── */
+.kbw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-1);
+  line-height: 1;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: 9px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  white-space: nowrap;
+  max-width: 100%;
+}
+.kbw-chip .kbw-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.kbw-chip.is-plain { background: transparent; padding-left: 0; padding-right: 0; }
+.kbw-chip.is-trunc { overflow: hidden; text-overflow: ellipsis; }
+
+/* 语义色：只用「色点 + 常规色文字 + 淡背景」——
+   ✅ 反色文字在 --color-yellow 上：**2026-09-28 量过了**（1.41:1 亮 / 2.09:1 暗，不合格）
+   → 黄徽标改成深色字，见下面 `.kbw-flag.flag-yellow` 那段的实测表（方案设计.md §5.5）。 */
+.kbw-dot.c-blue { background: var(--color-blue); }
+.kbw-dot.c-cyan { background: var(--color-cyan); }
+.kbw-dot.c-yellow { background: var(--color-yellow); }
+.kbw-dot.c-orange { background: var(--color-orange); }
+.kbw-dot.c-green { background: var(--color-green); }
+.kbw-dot.c-purple { background: var(--color-purple); }
+.kbw-dot.c-red { background: var(--color-red); }
+.kbw-dot.c-faint { background: var(--text-faint); }
+
+/* ── 健康标记徽标：**底色给色、文字给常态色**（P6 段⑥ 收口，2026-09-28）──────
+ *
+ * 改前是"**反色文字压在语义色满底上**"，真机量过、普遍不合格：
+ *
+ * ```
+ *   暗色主题（白字压语义色）      亮色主题
+ *   红 3.45 ✗  紫 2.88 ✗          黄 1.41 ✗（白字）/ 2.09 ✗
+ *   绿 2.02 ✗  橙 2.34 ✗          绿 2.61 ✗  橙 2.95 ✗  青 2.29 ✗
+ *   蓝 4.01 ✗（也只有它最接近）
+ * ```
+ * 根因不是配色挑错了，是**形态**：语义色里有一半天生是亮色（黄最极端），
+ * 而"反色文字"只有黑与白两张牌，怎么选都会在另一半主题上翻车。
+ * 设计系统早就写着答案（`方案设计.md` §5.5 / 本文件 `--kbw-nontext` 那一段）：
+ * **「色点 + 常规色文字 + 淡背景」** —— 把"色"从**文字底下**挪到**文字旁边**。
+ *
+ * 于是文字永远是 `--text-normal`（两个主题都自动达标），色相由**16% 的淡底**承担，
+ * 带文字的胶囊再补一个**色点**（把纯色相摆出来，16% 的淡底认不出是红还是紫）。
+ */
+.kbw-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: var(--fs-1);
+  line-height: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  /**
+   * ⚠️ **不许收缩**（P7.7c 真机实测的洞）：`min-width:16px` 是 `⚠` 时代留的位，
+   * 在**窄列/窄栏**里 flex 会一路把胶囊挤到 16px —— 短词文字溢出胶囊血洗（实测 19/16）。
+   * `flex:none` 之后胶囊永远按自然宽排；装不下时由容器的 `overflow:hidden` 硬裁尾
+   * （截断总比糊成一团好认）。表格列宽的正解是列宽本身（「标记」列默认 124）。
+   */
+  flex: none;
+  cursor: default;
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--flag-color, var(--text-faint)) 16%, transparent);
+}
+/**
+ * ⚠️ **色点只给"日志行"那种胶囊**（`.has-label`）。表格「标记」列的**短词胶囊不带点**
+ * —— 拍板照 `界面设计.html` 的 `.flg`（P7.7c · 10.5）：字形即语义，轻重的色相由
+ * 16% 淡底承担；那一列最多并排三枚短词，加点每枚再吃 10px（列宽只按短词算的账）。
+ */
+.kbw-flag.has-label::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--flag-color, var(--text-faint));
+}
+.kbw-flag.flag-red { --flag-color: var(--color-red); }
+.kbw-flag.flag-yellow { --flag-color: var(--color-yellow); }
+.kbw-flag.flag-green { --flag-color: var(--color-green); }
+.kbw-flag.flag-purple { --flag-color: var(--color-purple); }
+body.is-mobile .kbw-flag { cursor: pointer; }  /* 触屏：短词胶囊可点开（§5.9） */
+
+/**
+ * ⚠️ **一笔有意保留、别以为忘了的**：**色点本身到不了 3:1**（WCAG 1.4.11 那条非文字对比）：
+ * 黄色（#e0de71 / #e0ac00）在浅底上要够 3:1 就得暗到不再像黄色 —— 这是色相本身的性质，
+ * 不是调参能解决的。所以这里**不声称色点达标**：它是**辅助**提示，意义由文字
+ * （`--text-normal`，≥4.5:1）与 `title` 承担。判据只钉**文字**那一半（判据里记档"有意保留"）。
+ *
+ * （原先还欠着一条「表格『标记』列只靠颜色分轻重」—— P7.7c · 10.5 已落地：
+ * `⚠` 换成短词「错位/断链/缺项/未名/空文/外改」，字形即语义，列宽随词重排。）
+ */
+
+/* ── 输入框（recessed 层）───────────────────────────────────── */
+.kbw-input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: var(--radius-s, 4px);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--recessed);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--fs-3);
+  line-height: var(--lh-2);
+  outline: none;
+}
+.kbw-input::placeholder { color: var(--text-faint); }
+.kbw-input:focus {
+  border-color: var(--interactive-accent);
+  background: var(--surface-1);
+}
+
+/* ── 复选 / 开关 / 单选（菜单里的控件形态）───────────────────── */
+.kbw-check {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin: 0;
+  accent-color: var(--interactive-accent);
+  cursor: pointer;
+}
+
+.kbw-switch {
+  width: 32px;
+  height: 18px;
+  flex: none;
+  border-radius: 9px;
+  background: var(--background-modifier-border);
+  position: relative;
+  transition: background var(--t-base) var(--ease);
+}
+.kbw-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-on-accent, #fff);
+  box-shadow: var(--kbw-shadow-2);
+  transition: transform var(--t-base) var(--ease);
+}
+.kbw-switch.is-on { background: var(--interactive-accent); }
+.kbw-switch.is-on::after { transform: translateX(14px); }
+
+/* ⚠️ 原生 range 的选择器特异性是 (0,1,1)，会整条压掉裸类选择器；
+   且 intrinsic 宽只有 129px → 必须显式封顶（platform-pitfalls #34）。
+
+   🔴 **圆心偏心的根因**（P4.5 §1.3，2026-09-25 从 `obsidian.asar` 按字节取证）：
+   平台自己有一套 range 规则，我们只覆盖了宽高底色，剩下的**仍然生效**：
+     · `input[type='range'] { height: var(--slider-track-height) }`   → 桌面 4px
+     · `::-webkit-slider-runnable-track { height: 6px }`              → 轨道盒固定 6px
+     · `::-webkit-slider-thumb { height/width: var(--slider-thumb-height) = 18px;
+                                  position: relative; top: var(--slider-thumb-y) = -6px }`
+   `top: -6px` 是**给 18px 圆点配 6px 轨道用的**（(6-18)/2 = -6）。我们的圆点只有 12px，
+   那 -6px 照样生效 → 圆点被硬顶上去 6px（用户报的"圆圈不在横杆正中间"）。
+
+   修法（不赌 Chromium 内部怎么摆）：**让圆点直径 = 轨道盒高度 = 输入框高度**，
+   细横杆用居中渐变画在轨道盒里 → 三者共用一条中线，几何由构造保证。
+   另外平台的 `:hover/:active` 规则会把圆点改回 18px 并再偏 2px（`:active` 那段），
+   特异性比裸类选择器高 → 下面单独用同特异性的选择器按住。 */
+.kbw-slider input[type="range"],
+input[type="range"].kbw-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  max-width: 160px;
+  height: var(--kbw-range-dot);
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none; /* 清掉平台的 --slider-track-background（横杆改由轨道盒画） */
+  outline: none;
+}
+.kbw-slider input[type="range"]::-webkit-slider-runnable-track,
+input[type="range"].kbw-range::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  appearance: none;
+  height: var(--kbw-range-dot); /* == 圆点：这一条是"同心"的关键 */
+  border-radius: 999px;
+  background: linear-gradient(var(--background-modifier-border), var(--background-modifier-border))
+    center / 100% var(--kbw-range-bar) no-repeat;
+}
+.kbw-slider input[type="range"]::-webkit-slider-thumb,
+input[type="range"].kbw-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--kbw-range-dot);
+  height: var(--kbw-range-dot);
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  border: none;
+  /* 清掉平台那套定位（相对定位 + top + margin）；圆点大小 == 轨道盒大小 → 天然同心 */
+  position: static;
+  top: auto;
+  margin: 0;
+  box-shadow: none;
+  cursor: pointer;
+}
+/* 平台的 hover/active 规则（特异性 (0,3,1)）会把圆点变大变偏 —— 按住几何。
+   ⚠️ `:hover` 那半必须包在 `@media (hover: hover)` 里（§1.5 / platform-pitfalls #36：
+   触屏点完会留下悬停态），`:active` 不用包（触屏按住时正该亮）。 */
+.kbw-slider input[type="range"]:not(:disabled)::-webkit-slider-thumb:active,
+input[type="range"].kbw-range:not(:disabled)::-webkit-slider-thumb:active {
+  width: var(--kbw-range-dot);
+  height: var(--kbw-range-dot);
+  position: static;
+  top: auto;
+  margin: 0;
+  opacity: 1;
+  border: none;
+  box-shadow: none;
+  background: var(--interactive-accent-hover, var(--interactive-accent));
+}
+@media (hover: hover) {
+  .kbw-slider input[type="range"]:not(:disabled)::-webkit-slider-thumb:hover,
+  input[type="range"].kbw-range:not(:disabled)::-webkit-slider-thumb:hover {
+    width: var(--kbw-range-dot);
+    height: var(--kbw-range-dot);
+    position: static;
+    top: auto;
+    margin: 0;
+    opacity: 1;
+    border: none;
+    box-shadow: none;
+    background: var(--interactive-accent-hover, var(--interactive-accent));
+  }
+}
+.kbw-slider { display: inline-flex; align-items: center; gap: var(--sp-2); min-width: 140px; }
+.kbw-slider .kbw-slider-val {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  min-width: 26px;
+  text-align: right;
+}
+
+/* ── 分段控件 ───────────────────────────────────────────────── */
+.kbw-seg {
+  display: inline-flex;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  overflow: hidden;
+}
+.kbw-seg button {
+  font-size: var(--fs-2);
+  line-height: 1;
+  padding: 7px 11px;
+  color: var(--text-muted);
+  transition: background var(--t-base) var(--ease);
+  /* 相邻按钮之间的分隔线（稿子 `.seg button+button`）—— 首尾不画，不然会贴着外边框多两根线 */
+  border-left: 1px solid var(--background-modifier-border);
+  /**
+   * 🔴 **方角必须显式写**（P6⑤ 独立审查 A5 抓的回归）：平台的 `button` 带
+   * `border-radius: var(--button-radius)`（默认 5px，asar 取证），而 `base.css` 那组按钮复位
+   * **不含圆角** —— 原先这一条在 `notes.css` 里（搬内边距时被我连带删掉了），
+   * 结果中段按钮的 hover / 当前档变成**5px 圆角小块、格间还露缝**，与稿子（内层方角、
+   * 靠容器 `overflow:hidden` 裁）不一致。
+   * ⚠️ 判断方法：`getComputedStyle(segBtn).borderRadius` —— 这条没写时会量到 5px。
+   */
+  border-radius: 0;
+}
+.kbw-seg button:first-child { border-left: none; }
+/**
+ * 🔴 **选中态在这里没有规则，是有意的** —— 去 `styles/notes.css` 看 `.kbw-seg button.is-on`。
+ *
+ * 这里原先躺着稿子那条 `.seg button.on{background:var(--interactive-accent)}`，
+ * 而 notes.css 里有一条**同选择器**的"安静版"（hover 灰 + 常规色文字）。
+ * 同权重 → **后加载的 notes.css 赢**（`scripts/styles.mjs` 的 STYLE_ORDER 里 notes 在 components 之后）
+ * ⇒ 这条是**永不生效的死规则**，2026-09-28 对表时量过（真机 `is-on` 的背景是
+ * `oklch(0 0 none / 0.067)` = hover 灰，不是 accent）。
+ *
+ * 顺带删掉的还有一条**不死的**：`.kbw-seg button.is-on:hover{background:var(--interactive-accent)}`
+ * —— 它比那条安静版更具体，于是"鼠标划过当前档"时按钮会**突然变成 accent 蓝**（真机上一点就跳）。
+ * 现在让它落回 `.kbw-seg button:hover`（= hover 灰，与它的常态同色 → 划过不变色）。
+ */
+@media (hover: hover) {
+  .kbw-seg button:hover { background: var(--background-modifier-hover); }
+}
+
+/* ── 自研多选控件（平台没有）───────────────────────────────────
+   `文件位置` / `平台` / `tags` 都是列表型属性 → 平台只有单选属性选择器 */
+.kbw-multiselect {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 32px;
+  padding: 3px 6px;
+  border-radius: var(--radius-s, 4px);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--recessed);
+}
+.kbw-multiselect:focus-within { border-color: var(--interactive-accent); background: var(--surface-1); }
+.kbw-multiselect-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-2);
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: var(--radius-s, 4px);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  max-width: 100%;
+}
+.kbw-multiselect-item .kbw-x {
+  color: var(--text-faint);
+  font-size: var(--fs-2);
+  line-height: 1;
+  padding: 0 1px;
+}
+@media (hover: hover) {
+  .kbw-multiselect-item .kbw-x:hover { color: var(--color-red); }
+}
+.kbw-multiselect input {
+  flex: 1 1 80px;
+  min-width: 60px;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--fs-3);
+  outline: none;
+  padding: 4px 2px;
+}
+.kbw-dropdown {
+  position: absolute;
+  z-index: var(--z-kbw-menu);
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 220px;
+  overflow: auto;
+  padding: var(--sp-1);
+  border-radius: var(--kbw-menu-radius);
+  border: 1px solid var(--kbw-menu-border);
+  background-color: var(--kbw-menu-bg);
+  box-shadow: var(--kbw-menu-shadow);
+}
+.kbw-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-s, 4px);
+  font-size: var(--fs-3);
+  text-align: left;
+}
+.kbw-dropdown-item.is-hint { color: var(--text-faint); font-size: var(--fs-2); cursor: default; }
+
+/* ── 键盘键位 ─────────────────────────────────────────────────
+   ⚠️ 类名是 `kbw-keycap` 而**不是** `kbw-kbd`：后者是工作台**根元素**的"键盘高亮"旗标，
+   裸选择器 `.kbw-kbd` 会让整棵树继承键帽的样式（真机实测：根元素被打上 11px 等宽字 +
+   边框 + padding + `white-space: nowrap` —— 最后那条被后代继承，卡片与小窗预览就**不折行**了）。 */
+.kbw-keycap {
+  display: inline-block;
+  font-family: var(--font-monospace);
+  font-size: var(--fs-1);
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.kbw-keycap.is-recording { border-color: var(--interactive-accent); color: var(--interactive-accent); }
+/* 改过的键位标出来（默认键一水儿灰，改过的才显眼） */
+.kbw-keycap.is-custom { border-color: var(--interactive-accent); color: var(--interactive-accent); }
+.kbw-keycap .kbw-x { font-size: var(--fs-2); line-height: 1; }
+@media (hover: hover) {
+  .kbw-keycap .kbw-x:hover { color: var(--color-red); }
+}
+
+/* ── 表格（P0 只用于开发面板与快捷键表）──────────────────────── */
+.kbw-table { width: 100%; border-collapse: collapse; font-size: var(--fs-3); }
+.kbw-table th {
+  text-align: left;
+  font-size: var(--fs-1);
+  font-weight: 500;
+  color: var(--text-faint);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  white-space: nowrap;
+}
+.kbw-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  vertical-align: middle;
+}
+.kbw-table td.kbw-num { font-family: var(--font-monospace); font-size: var(--fs-2); color: var(--text-muted); }
+
+/* ── 分组卡片（面板里的小节）─────────────────────────────────── */
+.kbw-card {
+  background: var(--surface-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--kbw-shadow-2);
+  padding: var(--sp-4);
+}
+.kbw-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: var(--sp-5) 0 var(--sp-2);
+}
+.kbw-section-head h3 { margin: 0; font-size: var(--fs-4); font-weight: 600; }
+.kbw-section-head .kbw-cnt { margin-left: auto; font-size: var(--fs-2); color: var(--text-faint); }
+
+/* ── 轻量只读目录树（`ui/folder-tree.ts` · P7.10 三处共用）─────────
+   点节点即选中（行体）+ 三角单独展开；嵌套靠 `.kbw-ftree-kids` 的缩进。
+   hover 走 `.kbw-hover-1`（base.css，已包 `@media (hover: hover)`）。 */
+.kbw-ftree {
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--surface-2);
+  padding: var(--sp-2);
+}
+.kbw-ftree-kids { padding-left: var(--sp-4); }
+.kbw-ftree-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 3px var(--sp-2);
+  border-radius: var(--radius-s, 6px);
+  cursor: pointer;
+  color: var(--text-normal);
+}
+/* 选中不只靠颜色：加一圈内描边 + 主文字变色（语义不靠颜色，本项目到处在用） */
+.kbw-ftree-item.is-sel {
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+.kbw-ftree-tri {
+  flex: none;
+  width: 1em;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: var(--fs-1);
+}
+/* 叶子不画三角但**占位**（缩进对齐）；`visibility` 保住那一格宽 */
+.kbw-ftree-tri.is-leaf { visibility: hidden; }
+.kbw-ftree-name {
+  font-size: var(--fs-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kbw-ftree-none { font-size: var(--fs-2); color: var(--text-faint); padding: var(--sp-1) var(--sp-2); }

@@ -1,0 +1,443 @@
+/* ══════════════════════════════════════════════════════════════════
+   home · 首页（P1，交互规格 §2 / 视觉稿 ①屏）
+   ──────────────────────────────────────────────────────────────────
+   上半部 **Google 式**：居中标识 + 大搜索框 + 快捷动作，靠留白立住。
+   下半部 **回到工作台**：左对齐、发丝线分隔、无卡片外壳。
+   待处理为空时只剩一句「库是干净的」——最安静的样子。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 上半部 ─────────────────────────────────────────────────── */
+.kbw-hero {
+  text-align: center;
+  /**
+   * P7.2a 拆块口径：底 padding 从 sp-6 收到 0 —— 原来的"quickRow 之后"那段空间
+   * 随快捷动作拆成了独立块，改由 `.kbw-quickrow` 的下边距承担（合计间距不变）。
+   */
+  padding: var(--sp-8) 0 0;
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+.kbw-hero-mark { color: var(--interactive-accent); opacity: .9; }
+.kbw-hero-name {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-6);
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+.kbw-hero-sub { margin-top: var(--sp-1); font-size: var(--fs-2); color: var(--text-faint); letter-spacing: .12em; }
+
+.kbw-gsearch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-5) auto 0;
+  padding: 0 var(--sp-3);
+  height: 46px;
+  border-radius: 23px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--surface-1);
+  box-shadow: var(--kbw-shadow-2);
+  transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease);
+}
+.kbw-gsearch:focus-within {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+}
+.kbw-gsearch-ico { color: var(--text-faint); flex: none; }
+.kbw-gsearch-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--fs-4);
+  outline: none;
+}
+/* 键位提示：**`/`**（行为早已锁定为 `/`，不标 ⌘K）*/
+.kbw-key {
+  flex: none;
+  font-size: var(--fs-1);
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 搜索无结果 / 命令模式：就在搜索框下面浮出来（不跳走） */
+.kbw-hero-msg:not(:empty) { margin-top: var(--sp-2); text-align: left; }
+.kbw-hero-msg-line { font-size: var(--fs-2); color: var(--text-muted); padding: var(--sp-1) var(--sp-2); }
+.kbw-hero-cmd {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-s, 4px);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--surface-1);
+  font-size: var(--fs-3);
+}
+
+.kbw-quickrow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2);
+  /**
+   * P7.2a 拆块口径（合计间距与拆前等价）：上 = 原来相对搜索框的 sp-4；
+   * `auto` = 它原来在 `.kbw-hero`（640 居中）里，拆出来要自己居中
+   *（所在块容器是 720 档 —— 分隔线要 720 宽，按钮行仍 640）。
+   * 🔴 下 = **`calc(var(--sp-6) * 2)`＝48**，不是 sp-6：拆前"本行 → 分隔线"的 48px
+   *   = hero 的底 padding(24) + 线的 `margin-top`(24)（padding 挡着、不塌陷）；
+   *   拆后两者成了**相邻兄弟 margin** → 会塌陷取 max —— 要净得 48，就得写 48
+   *  （独立审查算的账；探针里有一条几何判据盯着这段）。
+   */
+  margin: var(--sp-4) auto calc(var(--sp-6) * 2);
+  max-width: 640px;
+}
+.kbw-qbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-size: var(--fs-2);
+  transition: background var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+.kbw-qbtn.is-ai { color: var(--interactive-accent); border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border)); }
+@media (hover: hover) {
+  .kbw-qbtn:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+}
+
+/* ── 分隔线 + 下半部 ───────────────────────────────────────── */
+.kbw-home-div {
+  height: 1px;
+  background: var(--background-modifier-border);
+  /**
+   * P7.2a 拆块口径：下边距 = `calc(var(--sp-5) + var(--sp-2))`＝28，不是裸 sp-2 ——
+   * 拆前"线 → 待处理标题"的 32px = body 的 padding-top(8) + 标题 `margin-top`(24→sp-5 是 20)…
+   * 精确账：拆前 = padding-top 8 + sec-head margin-top 20 = **28**（padding 挡塌陷）；
+   * 拆后线的 `margin-bottom` 与下一块里 `sec-head` 的 `margin-top`(20) 相邻塌陷取 max ——
+   * 要净得 28 就得写 28（独立审查算的账；探针里有一条几何判据盯着这段）。
+   * 分隔线现在住在快捷动作块里（见 `blocks/quick.ts`）。
+   */
+  margin: var(--sp-6) 0 calc(var(--sp-5) + var(--sp-2));
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+/* ⚠️ `.kbw-home-body` 已随 P7.2a 拆块删除（无生产者了）—— 宽度约束挪去了
+   `.kbw-hblock[data-w]`（见本文件末尾的区块体系段） */
+
+.kbw-sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: var(--sp-5) 0 var(--sp-2);
+}
+.kbw-sec-head h3 { margin: 0; font-size: var(--fs-3); font-weight: 600; color: var(--text-muted); }
+.kbw-sec-cnt { margin-left: auto; font-size: var(--fs-2); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.kbw-rule { height: 1px; background: var(--background-modifier-border); }
+
+.kbw-home-clean { padding: var(--sp-4) var(--sp-2); font-size: var(--fs-3); color: var(--text-faint); }
+
+/* ── 待处理行 ───────────────────────────────────────────────── */
+.kbw-todo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.kbw-todo-body { flex: 1; min-width: 0; }
+.kbw-todo-t { font-size: var(--fs-4); }
+.kbw-todo-t b { font-weight: 700; }
+.kbw-todo-m { font-size: var(--fs-2); color: var(--text-faint); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 动作词平时淡、悬停才染色（视觉稿的取舍）*/
+.kbw-todo-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  white-space: nowrap;
+  transition: color var(--t-base) var(--ease);
+}
+.kbw-todo-x {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity var(--t-base) var(--ease);
+}
+/* 行尾的 ✦（`.kbw-todo-ai`）随 P7.12 · R5 全撤（AI 入口 = 行菜单）—— 样式随功能删除，别回流 */
+/* ⚠️ 顶层 :hover 必须就地包进 `@media (hover: hover)` —— 否则触屏点完会残留悬停态 */
+@media (hover: hover) {
+  .kbw-todo:hover .kbw-todo-act { color: var(--interactive-accent); }
+  .kbw-todo:hover .kbw-todo-x,.kbw-todo-x:focus { opacity: 1; }
+}
+body.is-mobile .kbw-todo-x { opacity: 1; }
+.kbw-todo-rest { padding: var(--sp-2); font-size: var(--fs-2); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+/* P7.11 · #10：折叠行可点（展开 / 收起）—— 高亮 + 手型；`is-act` 的原样保留 */
+.kbw-todo-rest.is-act { color: var(--interactive-accent); cursor: pointer; }
+.kbw-todo-rest-act { margin-left: 6px; }
+
+/* ── 最近改动 ───────────────────────────────────────────────── */
+.kbw-rec {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--fs-3);
+}
+.kbw-rec-n { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbw-rec-w { flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbw-rec-t { flex: none; color: var(--text-faint); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
+
+/* ── 底部状态 ───────────────────────────────────────────────── */
+/* ⚠️ P7.11 · #6/#7 起工具条入行（`is-inline` 吃 auto）→ 状态文字恒定靠左、
+   工具在右端（演示稿 `.alignBox.good` 的形态）；原先的 `justify-content:center`
+   从此**永久失效**（auto 先吃光空白），P7.11 独立审 🟢 顺手清掉。 */
+.kbw-home-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-5) 0 var(--sp-3);
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  /* 状态行里的「3 分钟前 / 43 篇」——等宽数字（P7.7c · 顺路收四笔） */
+  font-variant-numeric: tabular-nums;
+}
+.kbw-home-foot-item { padding: 2px 6px; border-radius: var(--radius-s, 4px); }
+.kbw-home-foot-sep { color: var(--text-faint); }
+.kbw-live {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.kbw-live.is-on { background: var(--color-green); }
+.kbw-live.is-off { background: var(--color-yellow); }
+
+/* ══════════════════════════════════════════════════════════════════
+   P7.2a（§1.2）：区块体系 —— 容器宽度 · hover 工具 · 拖序 · 新模块
+   ──────────────────────────────────────────────────────────────────
+   每个区块一个容器（渲染循环建的 `.kbw-hblock[data-block]`）。
+   宽度档在容器上（`.kbw-hero`(640) / `.kbw-home-body`(720) 拆块前的约束挪到这儿，
+   视觉等价）；空块隐藏走 `[hidden]` 属性（`syncEmpty` 据此判全隐）。
+   ══════════════════════════════════════════════════════════════════ */
+/**
+ * 🔴 **`.kbw-home`（首页宿主）必须是 `position: relative`** —— 这不是装饰：
+ * `index.ts` 的 `moveGap` 用「宿主 rect + 各块 `offsetTop`」换算落点坐标，
+ * 而 `offsetTop` 是相对 **offsetParent** 的 —— 只有宿主自己是 offsetParent
+ * 两者才同一个系。（抄了网格 `layoutBoxes` 那套写法，就得连同
+ * `.kbw-grid-inner { position: relative }` **那一行**一起抄 —— 独立审查抓到的：
+ * 漏了它，落点整体偏 K px（顶栏+内边距 ≈80px），真机表现为"拖了不换位/后面几块够不着"。）
+ */
+.kbw-home { position: relative; }
+
+.kbw-hblock {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  /* 让位动画（拖动换位 / ↑↓ 换位都走它）—— 与网格 `.kbw-gcell` 同一档 */
+  transition: transform var(--t-slow) var(--ease);
+}
+.kbw-hblock[data-w='narrow'] { max-width: 640px; }
+.kbw-hblock[data-w='wide'] { max-width: 720px; }
+.kbw-hblock[hidden] { display: none; }
+
+/* 块头工具（桌面 hover 冒；触屏没有 hover → 常显） */
+.kbw-hblock-tools {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--t-base) var(--ease);
+  z-index: 3;
+}
+/* ⚠️ 顶层 :hover 就地包进 `@media (hover: hover)`（触屏点完残留悬停态那课） */
+@media (hover: hover) {
+  .kbw-hblock:hover .kbw-hblock-tools { opacity: 1; }
+  .kbw-htool:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+  }
+}
+.kbw-hblock-tools:focus-within { opacity: 1; }
+body.is-mobile .kbw-hblock-tools { opacity: 1; }
+
+.kbw-htool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  background: var(--surface-1);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+/**
+ * 🔴 **工具条"同排实排"**（P7.11 · #6/#7 批注定稿，取代早先算 top 值那版 ——
+ * 上一版量值算得对、**视觉仍偏**：段头 `align-items: baseline` 里 h3 的视觉中线
+ * 与行盒中线并不重合，绝对值对不齐）。
+ *
+ * 渲染循环每画完一块就把 `.kbw-hblock-tools` **挪进块的第一行**
+ *（`index.ts` 的 `placeBlockTools`：段头 `.kbw-sec-head` 或底部状态行 `.kbw-home-foot`），
+ * 到那儿它是**行内 flex 项**：`align-self: center` + `margin-left: auto` ——
+ * 中线由布局保证（探针双边几何 ≤2px 盯梢）。没有首行的块（hero / quick）
+ * 不挂 `is-inline`，留在容器上绝对定位 `top: 4px` 照旧。
+ *
+ * 连带的历史规则都退役了：段头的 `padding-right: 58px`（给绝对定位的工具让位）与
+ * `:has(.kbw-sec-head) top:-2px`（算值对齐）—— 工具入流之后自有占位、不再重叠，也不需要让位。
+ */
+.kbw-hblock-tools.is-inline {
+  position: static;
+  top: auto;
+  right: auto;
+  align-self: center;
+  margin-left: auto;
+}
+/**
+ * 🔴 **段头里已经有吃 `auto` 的计数时，工具不许再吃**（独立审 🟡1，真机视觉缺陷）：
+ * `[h3][.kbw-sec-cnt(auto)][工具(auto)]` 两份 auto 会**平分**剩余空白 → 计数被推到
+ * 行的水平中段（"待处理 …… 9 项 …… ⠿⋯"）。让计数独占 auto、工具只留一个固定 gap ——
+ * 与 walk 那条同课（见下）；**留白归计数**（它本来就该在右端）。
+ */
+.kbw-hblock .kbw-sec-head:has(.kbw-sec-cnt) .kbw-hblock-tools { margin-left: var(--sp-1); }
+/* 随机漫步：段头右侧 = 「换一批」图标 + 工具 —— 换一批吃 auto 空白，工具**紧跟在它后面**。
+   不给工具 auto，否则空白被两份 auto 平分、「换一批」会跑到行中间。 */
+.kbw-hblock[data-block='walk'] .kbw-hblock-tools { margin-left: var(--sp-1); }
+
+.kbw-hblock-grip { cursor: grab; }
+/* 触屏拖块 = 长按整块 —— 拖柄对触屏没有意义（藏掉；长按起手见 index.ts 的委托） */
+body.is-mobile .kbw-hblock-grip { display: none; }
+
+/* 拖动中：空位 · 浮块 · 全局光标 */
+.kbw-hgap {
+  border: 1px dashed var(--interactive-accent);
+  border-radius: var(--radius-m, 8px);
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+}
+.kbw-hfloat {
+  position: fixed;
+  z-index: var(--z-kbw-menu);
+  pointer-events: none;
+  margin: 0;
+  /**
+   * 🔴 **必须掐掉过渡**：克隆体带着 `.kbw-hblock` 的 `transition: transform`，
+   * 而拖动每帧都写 left/top（跟手）→ 过渡会把浮标拖成"永远落后半拍"的橡皮筋
+   *（`.kbw-gfloat` 记过同款账）。本规则在 `.kbw-hblock` 之后 = 同权重下靠顺序赢。
+   */
+  transition: none;
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-primary);
+  box-shadow: var(--kbw-shadow-3);
+  opacity: .92;
+}
+.kbw-hfloat .kbw-hblock-tools { display: none; }
+html.kbw-home-dragging { cursor: grabbing; }
+
+/* 随机漫步：「换一批」靠段头右侧（与 `.kbw-sec-cnt` 同位置） */
+.kbw-walk-refresh { margin-left: auto; }
+
+/* 教程卡片（M8 的壳） */
+.kbw-tut {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--surface-1);
+}
+.kbw-tut-t { font-size: var(--fs-4); font-weight: 600; color: var(--text-normal); }
+.kbw-tut-s { font-size: var(--fs-3); color: var(--text-muted); line-height: 1.7; }
+.kbw-tut-act { margin-top: var(--sp-1); }
+
+/* ── P7.2d：新手清单的 4 项（16.13）───────────────────────────── */
+.kbw-tut-list { display: flex; flex-direction: column; align-self: stretch; }
+.kbw-tut-item {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 7px 4px; border-radius: var(--radius-s);
+  font-size: var(--fs-3); color: var(--text-normal);
+  cursor: pointer;
+}
+/* ⚠️ 顶层 :hover 就地包进 `@media (hover: hover)`（platform-pitfalls #36：触屏点完残留悬停态） */
+@media (hover: hover) {
+  .kbw-tut-item:hover { background: var(--background-modifier-hover); }
+  .kbw-tut-item.is-done:hover { background: none; }
+}
+.kbw-tut-item + .kbw-tut-item { border-top: 1px dashed var(--background-modifier-border); }
+.kbw-tut-item.is-done { cursor: default; }
+.kbw-tut-item.is-done .kbw-tut-lb { color: var(--text-faint); text-decoration: line-through; }
+.kbw-tut-box {
+  flex: none; width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--background-modifier-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; line-height: 1; color: transparent;
+}
+.kbw-tut-item.is-done .kbw-tut-box {
+  background: var(--interactive-accent); border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.kbw-tut-lb { min-width: 0; }
+
+/* ── P7.2d：图谱卡（16.9-a）───────────────────────────────────── */
+/* 卡内高 ~240px。⚠️ 复用 `.kbw-graph-stage`（图模块那套藏 .view-header /
+   藏「筛选」栏 / 贴边满幅的规则全在它上面，见 styles/graph.css 的作用域注）——
+   这里只把它的弹性高度改成固定档。 */
+.kbw-hgraph-stage { flex: none; height: 240px; min-height: 0; }
+.kbw-hgraph-fail {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 8px var(--sp-3); font-size: var(--fs-2); color: var(--text-muted);
+}
+.kbw-hgraph-note {
+  flex: none; padding: 4px var(--sp-3) 8px;
+  font-size: var(--fs-1); color: var(--text-faint);
+}
+
+/* ── P7.2d：钉住的笔记 · B 内嵌小窗档（16.9-b）────────────────── */
+/* 宿主只给高度与描边 —— 面板自己走 `.is-docked`（铺满宿主、静态定位、无边框阴影）。
+   高 ~400px：正文拿大头（属性默认只铺 6 行，可拖分隔条 / ⚙ 里改）。 */
+.kbw-hcard-win {
+  height: 400px; min-height: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+  background: var(--background-primary);
+}
+/* 块内面板（`.is-docked` 档）里那几个浮层专属件的最后一道保险：
+   图钉 / 拖手柄 / 缩放角在停靠态本来就由各自逻辑关掉（见 editor.ts 的 embed 分支），
+   这里只兜视觉（万一从别的形态切进来，一帧内也别闪出来）。 */
+.kbw-hcard-win .kbw-panel-grip { display: none; }
+
+/* ── P7.2b：关键按钮的提示（1.6b · Q4 只做首页四钮）───────────────
+   ⚠️ **P7.7 收（2026-10-05 用户真机）**：四枚小「?」徽标退役 → 悬停停留 600ms 自动出提示
+   （`.kbw-qbtn-tip` 那套样式已删；逻辑在 `blocks/quick.ts` 的 `wireHoverTip`）。
+   这层 wrap 保留：`.kbw-quickrow` 的 gap 与尺寸口径一字未变，拆它没有收益。 */
+.kbw-qwrap {
+  display: inline-flex;
+}
+.kbw-qbtn-tip-body {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  line-height: var(--lh-3);
+  /* ⚠️ 显式写回来：`white-space` 是继承属性，本项目在竖条上栽过一次（见 components.css 那段） */
+  white-space: normal;
+  max-width: 240px;
+}

@@ -1,0 +1,24 @@
+node_modules/
+
+# 构建产物（方案设计.md §10）
+main.js
+styles.css
+
+# 测试临时工作区
+tests/.tmp/
+# 合成夹具（tests/fixture/ 的生成器每次重建的产物）
+tests/.fixture/
+
+*.log
+.DS_Store
+Thumbs.db
+
+# P-1 探针是留档证据（结论在 spikes/README.md）
+!spikes/**/main.js
+!spikes/**/styles.css
+
+# 宿主工具链 本地工作数据（会话记忆 / 日志）—— 不进版本库（P7.19 补）
+.tooling/
+
+# 参赛包缓存：Obsidian 安装器（341 MB，一次下载反复复用）—— 不进版本库（2026-10-13 补）
+.pack-cache/

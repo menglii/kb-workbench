@@ -1,0 +1,237 @@
+/* ══════════════════════════════════════════════════════════════════
+   panel · 面板 / 浮层容器（决策 30：从触发点展开）
+   两类：浮层（锚在触发点附近）与模态（居中 + 遮罩）
+   ══════════════════════════════════════════════════════════════════ */
+.kbw-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-kbw-panel);
+  background: rgba(0, 0, 0, .32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-5);
+  animation: kbw-fade var(--t-fast) var(--ease-enter);
+}
+@keyframes kbw-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.kbw-modal {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--kbw-modal-radius);
+  border: 1px solid var(--kbw-modal-border);
+  background-color: var(--kbw-modal-bg);
+  box-shadow: var(--kbw-shadow-3);
+  overflow: hidden;
+  /* 模态从中心长出；浮层用触发点（JS 写 --kbw-origin） */
+  transform-origin: var(--kbw-origin, 50% 50%);
+  animation: kbw-pop var(--t-fast) var(--ease-enter);
+}
+.kbw-modal.is-wide { max-width: 720px; }
+.kbw-modal.is-narrow { max-width: 400px; }
+
+/* ── P7.24 · L2 服务族**幕后模式** ──────────────────────────────
+   面板照常挂载、照常跑（确认卡是全局模态、照常弹），但这面 backdrop 整个不显示 ——
+   用户只看见确认卡。贴类的是 **backdrop**（`h.root.closest('.kbw-backdrop')`，
+   只藏 .kbw-modal 的话全屏遮罩会糊在屏幕上）。display:none 顺带把焦点面也摘了。 */
+.kbw-offstage { display: none !important; }
+
+.kbw-modal-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-5) var(--sp-3);
+}
+/**
+ * 模态头右侧的小按钮/胶囊（`PanelOptions.headActions`）。
+ *
+ * ⚠️ **别漏这条规则**（P6③ 的教训原样复用）：`.kbw-panel-actions` 当年就是"容器建了、
+ * 样式表里没有它"，直到面板头改成 flex 才暴露成"两个按钮竖着叠起来"。
+ * 模态头本来就是 flex —— 没有规则的话它会被标题挤成一个很窄的块，
+ * 里面的胶囊**逐字换行**（真机症状是"胶囊变成三行"）。
+ */
+.kbw-modal-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+/**
+ * 模态头**最左**那几个（`PanelOptions.headLeading`，P7.3b 起）。
+ * 与 `.kbw-modal-actions` 同一形状，只是不带 `margin-left:auto`（它就在最前面）。
+ */
+.kbw-modal-leading {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.kbw-modal-title {
+  margin: 0;
+  font-size: var(--fs-5);
+  font-weight: 600;
+  line-height: var(--lh-1);
+  flex: 1;
+  min-width: 0;
+}
+.kbw-modal-sub { font-size: var(--fs-2); color: var(--text-faint); margin-top: 2px; }
+.kbw-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--sp-5) var(--sp-4);
+}
+.kbw-modal-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-5) var(--sp-4);
+  border-top: 1px solid var(--background-modifier-border);
+}
+.kbw-modal-foot .kbw-spacer { flex: 1; }
+/**
+ * **底栏为空 = 不占位**（P6 ⑧-A）。"有没有按钮"这件事只有一个真源：**有没有子节点**。
+ *
+ * 🔴 它替掉的是一份"谁 append 谁记得把内联 `display:none` 解开"的隐含约定 ——
+ * 六个面板（wizard / ai-panel / migrate / backfill / rebuild / snapshot）没遵守，
+ * 于是**底部按钮一个都看不见**（内联样式压得过下面那条 `display:flex`）。
+ * ⚠️ `:empty` 的权重 (0,2,0) 高于 `.kbw-modal-foot` / `.kbw-panel-foot` (0,1,0)，
+ * 与它在文件里的位置无关 —— 别改成 `:not(:empty){display:flex}` 那种要靠顺序的写法。
+ */
+.kbw-modal-foot:empty, .kbw-panel-foot:empty { display: none; }
+
+/* ── 浮层（锚在触发点）───────────────────────────────────────── */
+.kbw-panel {
+  position: fixed;
+  z-index: var(--z-kbw-panel);
+  border-radius: var(--kbw-menu-radius);
+  border: 1px solid var(--kbw-menu-border);
+  background-color: var(--kbw-menu-bg);
+  box-shadow: var(--kbw-menu-shadow);
+  transform-origin: var(--kbw-origin, 0 0);
+  animation: kbw-pop var(--t-base) var(--ease-enter);
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  min-width: 240px;
+  max-width: min(520px, calc(100vw - 16px));
+}
+
+/* ── 浮层·停靠态（d2 期 §3.1）───────────────────────────────────
+   搬进 `.kbw-dock` 之后，这一块**不再是浮层**：没有 fixed 定位、没有圆角阴影、
+   没有"点外面就关"（那些行为在 `ui/panel.ts` 的 `setDocked` 里按模式分流）。
+   ⚠️ **这里不许写 `animation: none`** —— 同 `.kbw-panel-grab` 那条注释：
+   进出停靠态时类名会被摘挂，而 `animation` 从 `none` 恢复会**重放入场动画**
+   （看起来就是"取消停靠之后它又弹了一下"）。入场动画只在打开那一瞬间播一次。 */
+.kbw-panel.is-docked {
+  position: static;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background-color: transparent;
+  transform-origin: 0 0;
+  /* 窗格自己**不滚**：滚动交给里面那几块（`.kbw-cw-props` 中段可滚、
+     编辑器自己滚）。整块滚的话表头与底部按钮会跟着跑掉。 */
+  overflow: hidden;
+}
+
+/* 低密度：确认流与空态才用大字宽距（方案设计.md §5.2 密度分层） */
+.kbw-dense { font-size: var(--fs-3); }
+.kbw-loose { font-size: var(--fs-4); }
+
+/* ══════════════════════════════════════════════════════════════════
+   P1：快照面板的行 + 筛选/属性面板的小件
+   ══════════════════════════════════════════════════════════════════ */
+.kbw-snap-list { display: flex; flex-direction: column; }
+.kbw-snap-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-1);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--fs-2);
+}
+.kbw-snap-row.is-head {
+  border-bottom: 1px solid var(--background-modifier-border-hover, var(--background-modifier-border));
+  color: var(--text-faint);
+  font-size: var(--fs-1);
+}
+.kbw-snap-c1 { width: 110px; flex: none; font-variant-numeric: tabular-nums; }
+.kbw-snap-c2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-normal); }
+.kbw-snap-c3 { width: 190px; flex: none; color: var(--text-muted); }
+.kbw-snap-c4 { width: 70px; flex: none; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.kbw-snap-c5 { width: 130px; flex: none; display: flex; gap: var(--sp-1); justify-content: flex-end; }
+.kbw-snap-empty { padding: var(--sp-5) var(--sp-2); color: var(--text-faint); font-size: var(--fs-2); }
+
+.kbw-panel-group {
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  letter-spacing: .04em;
+}
+.kbw-panel-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kbw-panel-hint { margin-top: var(--sp-2); font-size: var(--fs-1); color: var(--text-faint); }
+/* 写坏的日期词（P7.12 · 21.5）：就地红字说清"看不懂" —— 别让用户对着"没生效"猜 */
+.kbw-panel-hint.is-warn { color: var(--color-red); }
+.kbw-panel-control .kbw-input { width: 100%; }
+.kbw-panel-field { display: flex; align-items: flex-start; gap: var(--sp-3); margin-top: var(--sp-3); }
+.kbw-panel-label { flex: none; width: 72px; padding-top: 6px; font-size: var(--fs-2); color: var(--text-muted); }
+.kbw-panel-control { flex: 1; min-width: 0; }
+.kbw-chip.is-pickable { cursor: default; border: 1px solid transparent; }
+.kbw-chip.is-pickable.is-on {
+  background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+  font-weight: 600;
+}
+.kbw-select { padding: 6px 8px; border-radius: var(--radius-s, 4px); border: 1px solid var(--background-modifier-border); background: var(--recessed); color: var(--text-normal); font-family: inherit; }
+
+/* 浮层的头（标题 + 副标题）—— 筛选/属性/标签面板 */
+.kbw-panel-head {
+  padding: var(--sp-3) var(--sp-3) var(--sp-1);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+/* 面板头可拖（a.5-2）：给个"能抓"的提示。
+   🔴 **这里不许再写 `animation: none`**（真机反馈 2026-09-25："小窗拖动后会重新弹一下、一闪一闪"）：
+   那条规则会随 `.is-dragging` 在拖动结束时被撤掉，而 `animation` 从 `none` 恢复成 `kbw-pop`
+   **会重放一次入场动画** —— 看起来就是"拖完它又弹出来了"。
+   入场动画只在打开那一瞬间播一次，拖动根本不该碰它（`.kbw-panel` 上那条 `animation` 保留）。 */
+/**
+ * 头右侧那排小按钮（图钉 / ⚙）。
+ *
+ * 🔴 **这一条一直是缺的**（P6b ⑤ 做"一行头"时才露出来）：`ui/panel.ts` 会给它们套一个
+ * `.kbw-panel-actions` 容器，但样式表里**从来没有它的规则** —— 于是容器是 `display: block`，
+ * 两个按钮以行内块的方式挨在一起。⑤ 把面板头改成 flex 行之后，容器被压成 37px 宽 →
+ * **两个按钮竖着叠起来**（真机量到 29×29 两枚叠成 58 高，整个头 74px）。
+ * 显式写成一行、并 `flex: none`（不许被标题挤扁）。
+ */
+.kbw-panel-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+.kbw-panel-grab { cursor: move; user-select: none; }
+.kbw-panel-grab .kbw-panel-title, .kbw-panel-grab .kbw-panel-sub { pointer-events: none; }
+.kbw-panel-title { font-size: var(--fs-4); font-weight: 600; }
+.kbw-panel-sub { margin-top: 2px; font-size: var(--fs-1); color: var(--text-faint); }
+.kbw-panel-foot {
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--background-modifier-border);
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}

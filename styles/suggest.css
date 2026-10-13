@@ -1,0 +1,346 @@
+/* ══════════════════════════════════════════════════════════════
+   整理建议面板（P7.6 · 11.1 · ui/suggest-panel.ts）
+   三段：整理建议（勾选行）/ MOC 挂链 / 关联提示（只读）
+   ══════════════════════════════════════════════════════════════ */
+
+.kbw-suggest {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── 头部：范围 seg（左）· 刷新图标 + ⚙ 来源（右）· 出错行（整行）──
+   P7.9 · ⑥ 极简：来源开关压成菜单、刷新缩成小图标；`margin-right:auto` 把尾巴推右端。 */
+.kbw-suggest-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0 var(--sp-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.kbw-suggest-head .kbw-seg { margin-right: auto; }
+/* ⚙ 来源：图标 + 两字，gap 收紧（ghost 小按钮） */
+.kbw-suggest-srcbtn { display: inline-flex; align-items: center; gap: 4px; }
+.kbw-suggest-note {
+  flex-basis: 100%;
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-suggest-note.is-bad {
+  color: var(--color-red);
+  /* P7.13a · #5a（Q14 拍定）：**换行全显、不限高** —— 覆盖基类的单行省略
+     （AI 出错/没出值这类长句原先被 nowrap+ellipsis 截断，用户看不到全句）。 */
+  white-space: normal;
+  overflow: visible;
+}
+/* 「一键清空此类…」排文本后（过长自然另起行）——与文本留一口气 */
+.kbw-suggest-note.is-bad .kbw-suggest-clearbtn {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* ── 列表 ── */
+.kbw-suggest-list {
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: var(--sp-3);
+}
+.kbw-suggest-empty {
+  padding: var(--sp-4) var(--sp-2);
+  font-size: var(--fs-3);
+  color: var(--text-faint);
+}
+/* R1（P7.12）：空态的"下一步"小字（照 §R1 稿） */
+.kbw-suggest-emptynote {
+  margin-top: 3px;
+  font-size: var(--fs-2);
+}
+
+/* ── 四选一（P7.11 · #12）：A 搬笔记 / B YAML 头 / C 结尾双链 / D 我全都要 ──
+   （原「要搬的 · N 篇 / 要挂链的 · N 篇」两段段头被它取代 —— 清单内不再画段头） */
+.kbw-suggest-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-2) var(--sp-1);
+}
+.kbw-suggest-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 7px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: var(--fs-3);
+}
+.kbw-suggest-opt.is-on {
+  border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+}
+/* R1（P7.12）：圆点整个去掉（照 §R1 稿）—— 选中 = 描边 + 淡底（上面 .is-on），
+   不做颜色单传导：键徽标 A/B/C/D + 描边是双信号 */
+.kbw-suggest-optkey { font-weight: 700; color: var(--text-normal); }
+.kbw-suggest-optlabel { color: var(--text-normal); }
+
+/* ── 一条建议行 ── */
+.kbw-suggest-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--fs-3);
+  cursor: pointer;
+}
+.kbw-suggest-check { flex: none; margin: 0; }
+.kbw-suggest-title {
+  flex: none;
+  font-weight: 600;
+  color: var(--text-normal);
+  max-width: 36%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-suggest-arrow { flex: none; color: var(--text-faint); }
+/* 落点**加粗**（P7.9 · ⑥ 对照效果稿：行里最该看清的就是"去哪"）
+   ⚠️ `.kbw-suggest-path` / `.kbw-suggest-ev` 随极简版退役（进行 title 了，别再加回来） */
+.kbw-suggest-to {
+  flex: none;
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40%;
+}
+.kbw-suggest-lock { flex: none; display: inline-flex; align-items: center; color: var(--text-faint); }
+
+/* 来源徽标（三个源各一色档，用中性底 + 字色区分，别抢主内容） */
+.kbw-suggest-src {
+  flex: none;
+  font-size: var(--fs-1, 11px);
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+.kbw-suggest-src.is-ai { border-color: var(--interactive-accent); color: var(--interactive-accent); }
+.kbw-suggest-src.is-learned { border-style: dashed; }
+
+/* 清单行的说明格（area / tail / migrate）：faint 短句；migrate 行没有复选框，
+   用一个「·」占住那个 16px 的位置（行的左缘对齐不塌） */
+.kbw-suggest-muted {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* #10① 拍定：行尾「AI 未出值」——比 muted 再淡一档（那是"结论"，这是"缺口的注记"）。
+   ⚠️ 独立审 C4（P7.12 收尾）补：类一直在用、样式一直没定义，这句"小字"从不发灰。 */
+.kbw-suggest-dim {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--text-faint);
+  opacity: 0.75;
+  font-size: var(--fs-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-suggest-bullet {
+  width: 16px;
+  flex: none;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+/* 拦下的说明 + 尾部提示 */
+.kbw-suggest-dropped {
+  padding: var(--sp-2) var(--sp-2) 0;
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 每段底部的执行条 */
+.kbw-suggest-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-2) var(--sp-4);
+}
+/* ✦ AI 按钮 = 底栏主角（P7.12 · R1：照 §R1 稿升成**实心主按钮**；
+   填充样式由 `.kbw-btn.is-primary` 承担，这里不再另描一套） */
+.kbw-suggest-spacer { flex: 1; }
+/* 底栏的「已勾 N 项」（P7.11 · #12；R1 起挨在主角左边）—— 控制与数据，不与按钮抢焦 */
+.kbw-suggest-count {
+  flex: none;
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 关联提示（只读）：折叠行是**开关**（P7.9 · ⑥）─────────── */
+.kbw-suggest-fold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-2);
+  border-top: 1px dashed var(--background-modifier-border);
+  background: transparent;
+  box-shadow: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  color: var(--text-muted);
+  font-size: var(--fs-3);
+  cursor: pointer;
+  text-align: left;
+}
+.kbw-suggest-fold-arrow { color: var(--text-faint); }
+.kbw-suggest-pair {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2);
+  font-size: var(--fs-3);
+}
+.kbw-suggest-pair .kbw-suggest-title { max-width: 40%; }
+.kbw-suggest-pair .kbw-suggest-arrow { color: var(--text-muted); }
+
+/* ── 「AI 起标题」面板（P7.8 · 1.5 的「未命名」行；P7.11 · #3 卡片化）──
+   每篇一张卡：卡头《名》+ 路径，卡内 A/B/C/D 单选题；usage 小字落底栏右端。 */
+/* 面板头标题左侧的 ✦（accent，与「✦ AI 分类 / 选节」同族标识）。
+   模态头 flex 的 gap 是 sp-2 —— 星星右缘收 4px，视觉与标题成一体 */
+.kbw-title-star {
+  color: var(--interactive-accent);
+  font-weight: 600;
+  margin-right: -4px;
+}
+.kbw-title-note {
+  padding: var(--sp-1) var(--sp-2) 0;
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+}
+.kbw-title-note.is-hidden { display: none; }
+/* 出错 / 未配置那句要**可见**（§11 安全例外）；出错 = 红字 */
+.kbw-title-note.is-bad { color: var(--color-red); }
+.kbw-title-list { display: flex; flex-direction: column; gap: var(--sp-2); padding-top: var(--sp-2); }
+/* 一张卡（卡头《名》+路径 / 卡内选项区） */
+.kbw-title-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+}
+.kbw-title-rowhead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.kbw-title-cur { font-weight: 600; font-size: var(--fs-3); white-space: nowrap; }
+/* 硬拦的行（AI 指令集）：整卡压淡 —— 说明占掉选项区（独立审 🟢2） */
+.kbw-title-row.is-blocked .kbw-title-cur { color: var(--text-muted); }
+.kbw-title-rel {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-title-opts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-top: var(--sp-1);
+}
+/* 一枚选项行（试卷感：字母徽 + 文字；选中 = accent 描边 + 淡底） */
+.kbw-title-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: var(--fs-3);
+  color: var(--text-normal);
+}
+.kbw-title-opt.is-on {
+  border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+}
+.kbw-title-key {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  font-size: var(--fs-1, 11px);
+  color: var(--text-faint);
+}
+.kbw-title-opt.is-on .kbw-title-key { border-color: var(--interactive-accent); color: var(--interactive-accent); }
+.kbw-title-optlabel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbw-title-optdim { color: var(--text-faint); font-size: var(--fs-2); flex: none; }
+/* C 项被点开之后就地的输入框（吃满行内剩余宽度；行本身就是它的框） */
+.kbw-title-opt.is-input { cursor: text; }
+.kbw-title-opt.is-input .kbw-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  height: auto;
+  font-size: inherit;
+  color: inherit;
+}
+.kbw-title-muted { font-size: var(--fs-2); color: var(--text-faint); }
+.kbw-title-blocked { font-size: var(--fs-2); color: var(--text-warning, var(--text-faint)); }
+.kbw-title-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-2) var(--sp-2);
+}
+/* usage 小字：底栏右端、faint、最小字号（P7.11 · #3：不与按钮抢焦） */
+.kbw-title-usage {
+  margin-left: auto;
+  font-size: var(--fs-1, 11px);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.kbw-title-usage.is-hidden { display: none; }
+
+/* ── 修前言面板（P7.16 · #3）：行卡复用上面那组 .kbw-title-*，这里只补两行说明 ──
+   「坏在」用警示色（它是"为什么这篇动不了"），「能当场修 / 认不得」是说明文字。
+   类名是全仓独有（起名前 grep 过），不参与任何共用组件。 */
+.kbw-fmrep-bad {
+  font-size: var(--fs-2);
+  color: var(--text-warning, var(--text-muted));
+}
+.kbw-fmrep-plan {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+}
+.kbw-fmrep-plan.is-ai { color: var(--text-faint); }
+.kbw-fmrep-acts { display: flex; gap: var(--sp-2); padding-top: var(--sp-1); }

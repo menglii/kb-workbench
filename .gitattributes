@@ -1,0 +1,12 @@
+# 行尾统一成 LF —— 否则 Windows 上"工作区 CRLF / 仓库 LF"会让
+# 「从零克隆构建」与「本地构建」的产物差几百字节（每个 \r 一个字节），
+# 而 `deploy` 与测试都要比对产物，白折腾。
+* text=auto eol=lf
+
+# 二进制/不该动的东西
+*.png binary
+*.jpg binary
+*.exe binary
+*.asar binary
+*.sha256 binary
+package-lock.json text eol=lf

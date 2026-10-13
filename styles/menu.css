@@ -1,0 +1,130 @@
+/* ══════════════════════════════════════════════════════════════════
+   menu · 三级菜单（交互规格 §8.4：Windows 手感）
+   行高 32px · 每项左侧 15px 图标 · 子菜单悬停飞出 · 不可用项置灰
+   三条硬规矩：作用域行常驻 / 一级最多 8 项 / 危险项最后且上方有分隔线
+   ══════════════════════════════════════════════════════════════════ */
+@keyframes kbw-pop {
+  from { opacity: 0; transform: scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+
+.kbw-menu {
+  position: fixed;
+  z-index: var(--z-kbw-menu);
+  min-width: 208px;
+  max-width: 360px;
+  padding: var(--sp-1);
+  /* 用平台自己的菜单变量（主题改过就跟着改），与原生右键菜单同一套观感 */
+  border-radius: var(--kbw-menu-radius);
+  border: 1px solid var(--kbw-menu-border);
+  background-color: var(--kbw-menu-bg);
+  box-shadow: var(--kbw-menu-shadow);
+  backdrop-filter: var(--menu-backdrop-filter, none);
+  font-size: var(--fs-3);
+  color: var(--text-normal);
+  /* 从触发点展开（决策 30）：transform-origin 由 JS 按右键位置写进 --kbw-origin */
+  transform-origin: var(--kbw-origin, 0 0);
+  animation: kbw-pop var(--t-base) var(--ease-enter);
+}
+
+/* 作用域行常驻：第一行永远写着"这次改的是谁" */
+.kbw-menu-scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 7px;
+  margin-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-menu-scope.is-note { color: var(--text-muted); }
+/* 可点作用域行（P7.13a · #4 · Q13）：点它展开选择菜单（选范围）——hover 背景走
+   `.kbw-hover-1`（base.css，已包 @media (hover: hover)，触屏不会残留悬停态）。 */
+.kbw-menu-scope.is-pick { cursor: pointer; color: var(--text-muted); }
+.kbw-menu-scope.is-pick .kbw-menu-arrow { margin-left: auto; }
+
+/* 非交互提示行（P7.12 · R2）：一句话说清这扇菜单干什么；不接点击、不进键盘导航 */
+.kbw-menu-hintline {
+  padding: 5px 10px 7px;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 4px;
+}
+.kbw-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-s, 4px);
+  text-align: left;
+  color: var(--text-normal);
+  transition: background var(--t-fast) var(--ease);
+}
+.kbw-menu-item.is-tall { height: auto; min-height: 32px; padding-top: 6px; padding-bottom: 6px; }
+.kbw-menu-item .kbw-ico {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.kbw-menu-item .kbw-ico:empty::before { content: ""; }
+.kbw-menu-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-menu-hint {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbw-menu-arrow { flex: none; color: var(--text-faint); display: inline-flex; }
+.kbw-menu-control { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); }
+.kbw-menu-item.is-active,
+.kbw-menu-item.is-open { background: var(--background-modifier-hover); }
+.kbw-menu-item.is-disabled { opacity: .45; cursor: not-allowed; }
+.kbw-menu-item.is-disabled .kbw-menu-hint { opacity: .9; }
+.kbw-menu-item.is-danger { color: var(--color-red); }
+.kbw-menu-item.is-danger .kbw-ico { color: var(--color-red); }
+.kbw-menu-item.is-checked .kbw-ico { color: var(--interactive-accent); }
+
+.kbw-menu-sep {
+  height: 1px;
+  margin: var(--sp-1) 6px;
+  background: var(--background-modifier-border);
+}
+
+/* 菜单里的文本输入（「移动到…」原地变输入框） */
+.kbw-menu-input { padding: var(--sp-1) 10px var(--sp-2); }
+.kbw-menu-input .kbw-input { font-size: var(--fs-2); padding: 5px 8px; }
+
+/* 二级：悬停飞出，超出视口由 JS 翻边 */
+.kbw-menu.is-sub { animation: none; }
+
+/* ──────────────────────────────────────────────────────────────
+   原生属性面板「文件位置」那一格（P7.16b）：
+   我们的目录菜单开着期间（body 上挂着 kbw-native-menu-open —— 见 ui/native-position.ts），
+   把**平台的**属性建议暂时藏起来 —— 两个菜单同屏会打架（用户口径：点开那一格只有一份菜单）。
+   ⚠️ 类名与 TS 里那份各写一遍，改名要两边一起（红线里有静态断言钉着）。
+   ⚠️ !important 是必须的：平台用行内 style 显示/隐藏这个容器，不压盖不住。
+   ⚠️ 只藏 mod-property-value 这一档（属性值的建议）—— 其它建议容器（[[链接]]补全等）不碰。
+   ────────────────────────────────────────────────────────────── */
+body.kbw-native-menu-open .suggestion-container.mod-property-value {
+  display: none !important;
+}

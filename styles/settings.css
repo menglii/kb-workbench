@@ -1,0 +1,651 @@
+/* ══ 设置面板（交互规格 §7 七栏）+ 新建笔记对话框 + 挑一个/问一句 ══
+   只写结构与间距；颜色/圆角/动效一律走 tokens.css 的变量（零硬编码颜色）。 */
+
+/* ── 外壳：左栏 6 项 + 右栏内容（P6 第八段从八栏收的，见交互规格 §7） ── */
+/**
+ * 🔴 **高度写死、内容自己滚**（P6 第八段）：原来是 `min/max-height`（380~640），
+ * 于是**每换一栏整块面板就跳一次高度**（真机实测：自动化 773px → 帮助 590px，
+ * 点一下左栏、整个对话框抽一下）。固定之后换栏只换内容。
+ * ⚠️ 窄档（`data-w='narrow'`）要还回 `auto` —— 那儿是竖排，没有"固定高度"的语义。
+ */
+.kbw-set-shell {
+  display: flex;
+  gap: var(--sp-4);
+  height: min(72vh, 640px);
+}
+
+/**
+ * 面板头上那枚「显示说明」（P6 第八段 ②）。
+ *
+ * 🔴 **必须自带可见的框**：`.kbw-chip.is-pickable` 的边框是**透明**的
+ *（`styles/panel.css` 里那条，给筛选面板的胶囊用的），而 `--background-modifier-hover`
+ * 在默认亮色主题下**算出来就是完全透明** —— 真机上量到 `bg/border` 都是 `rgba(0,0,0,0)`，
+ * 于是它读起来像一句**标注**、不像能点的东西。选择器要比 `.kbw-chip.is-pickable`（0,2,0）
+ * 更重，所以这里挂两层类（同权重谁赢看文件顺序，别赌）。
+ */
+.kbw-modal-actions .kbw-chip.is-pickable {
+  border-color: var(--background-modifier-border);
+  background: var(--recessed);
+  color: var(--text-muted);
+}
+.kbw-modal-actions .kbw-chip.is-pickable.is-on { color: var(--text-normal); }
+
+/* ── 搜索（P6 第八段 ①）：整行铺在面板顶上，右栏换结果 ────────── */
+.kbw-set-searchbar { margin-bottom: var(--sp-3); }
+.kbw-set-search { width: 100%; }
+.kbw-set-hsearch-n {
+  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.kbw-set-results { display: flex; flex-direction: column; gap: 2px; }
+.kbw-set-result {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-s, 4px);
+  background: transparent;
+  color: var(--text-normal);
+  font-size: var(--fs-3);
+  text-align: left;
+  cursor: pointer;
+}
+.kbw-set-result-sec {
+  flex: none;
+  min-width: 4.5em;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+}
+.kbw-set-result-t { flex: none; }
+.kbw-set-result-h {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kbw-set-rail {
+  flex: none;
+  width: 148px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: var(--sp-2);
+  border-right: 1px solid var(--background-modifier-border);
+  overflow-y: auto;
+}
+
+.kbw-set-tab {
+  display: flex;
+  align-items: center;
+  /**
+   * 🔴 **E1（用户 2026-09-27）**：左栏每一项要**靠左**。
+   * 这里原先只有 `text-align: left`（对 flex 容器**不起作用**）—— 真正管排布的是
+   * `justify-content`，而它的默认值 `normal` 在这套主题下被解析成 `center`，
+   * 于是每行"图标 + 文字"**各自居中**、左边缘参差（真机量到 icon 的 x = 549/549/541/534/556…）。
+   * 照 CSS 里那句 `text-align` 猜会改错层；这条是**真机量出来的**。
+   */
+  justify-content: flex-start;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-s, 4px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--fs-3);
+  text-align: left;
+  cursor: pointer;
+}
+.kbw-set-tab.is-on {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-weight: 600;
+  /* E2：当前那一栏给一条主题色竖条 —— 没有它时"哪一栏开着"只靠底色深浅区分 */
+  box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+.kbw-set-tab.is-ghost { color: var(--text-faint); font-size: var(--fs-2); }
+.kbw-set-railfoot { margin-top: auto; padding-top: var(--sp-2); }
+
+.kbw-set-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: var(--sp-1);
+}
+/* ⚠️ 栏顶那层 head（`.kbw-set-head` + `h2.kbw-set-title`）**已删**（2026-09-28）——
+   真机上它和栏内的 h3 是「同一个词在 54px 内出现两次」。标题现在**只有**各栏
+   `kit.setTitle()` 画的 `.kbw-set-h` 那一层（下面那段）。
+   `.kbw-set-head` / `.kbw-set-title` 两条规则随之删掉（判据：栏里 h2/h3 各只有 1 个）。 */
+/* ⚠️ `.kbw-set-sub` 的规则**只有下面那一条**（P6b 收尾：这里原先还重复定义了一份，
+   后者胜、前者纯冗余 —— 独立审查 A🟡8 指出的） */
+
+/**
+ * 栏标题区（P6b ⑦，用户 2026-09-27 原话："设置界面设置标题和设置项区分不明显，
+ * 建议**加一条横线分割**"）。
+ *
+ * 症状（真机截图确认过）：h3「自动化」紧跟着组标题「自动化」，两者**一样近** ——
+ * 分不清"这一栏开始了"还是"这只是又一个小节"。修法只用字号 + 间距 + **一条通栏线**，
+ * 不引入新色（设计系统那条：层次靠间距与字重，不靠装饰色）。
+ */
+.kbw-set-h {
+  margin-bottom: var(--sp-3);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+  /* P6 第八段：「问 AI」挂在这一行的右端（标题左、动作右）*/
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+.kbw-set-htxt { flex: 1 1 auto; min-width: 0; }
+.kbw-set-h h3 { margin: 0; font-size: var(--fs-4); font-weight: 600; }
+.kbw-set-sub { display: block; margin-top: 2px; color: var(--text-faint); font-size: var(--fs-2); }
+.kbw-set-askai { flex: none; }
+
+/* ── 分组标题 ──────────────────────────────────────────────── */
+/**
+ * 小节标题（E2 排版）：**做"安静的分节线"，不与行标签抢字号**。
+ * 原先它是 `fs-3 / 600`，与行标签（`.kbw-set-label-t` 也是 `fs-3`）**一样大** ——
+ * 于是"分组"和"分组里的某一项"在视觉上是同一级（用户报的"层次性不够"）。
+ * 改成小号 + 疏排 + 灰字：内容是主角，分节线退到后面去。
+ */
+.kbw-set-group {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: var(--sp-5) 0 var(--sp-1);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.kbw-set-group-t {
+  font-size: var(--fs-1);
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+}
+/**
+ * 小节标题旁边那句 —— **和行内说明是同一类东西，一起收**（P6 第八段 ②）。
+ *
+ * 🔴 第一版只收了 `.kbw-set-label .kbw-set-hint`，结果真机截图上**灰字并没有少下去**：
+ * 六栏一合并，小节从 2 个变成 4~5 个，「新建空白笔记时按模板补前言与尾部双链」
+ * 这种句子一条不少（真机实拍发现的，离线用例看不见）。用户原话是
+ * "简化甚至去除**各选项**的提示小字" —— 小节那句也是"提示小字"。
+ * ⚠️ **栏顶那句（`.kbw-set-sub`）留着**：它写的是"数据在哪"
+ *（`库内配置：99_Meta/06_工作台/自动化.json`），不是解释、是坐标。
+ */
+.kbw-set-group-s { font-size: var(--fs-1); color: var(--text-faint); display: none; }
+.kbw-set-shell.is-showsub .kbw-set-group-s { display: inline; }
+
+/* ── 行：左标签 + 右控件 ───────────────────────────────────── */
+.kbw-set-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  min-height: 34px;
+}
+.kbw-set-row + .kbw-set-row { border-top: 1px solid var(--background-modifier-border-hover, transparent); }
+/**
+ * E2：**只读说明行**（套用规则 / 触发条件 / 位置锁定…）与"能改的行"一眼分开 ——
+ * 两类行的左标签长得一样，区别只在右边那块（开关 vs 一段灰字）。给只读行一点底，
+ * "这里只是告诉你" 就不用读完才知道。
+ */
+.kbw-set-row.is-read {
+  background: color-mix(in srgb, var(--background-secondary) 60%, transparent);
+  border-radius: var(--radius-s, 4px);
+  padding-left: var(--sp-2);
+  padding-right: var(--sp-2);
+  /**
+   * 🔴 **让灰框顶到行的上缘**（P6b ⑧，用户原话："中间那一栏往上拓展，两个灰色矩形框
+   * 没对齐不好看"）：行本身 `align-items: flex-start`，而右边那个 `.kbw-set-ctl` 是
+   * 居中的 —— 于是两块灰底的**上缘**随内容高度各自浮动，看着"没对齐"。
+   * 这里改成 stretch：灰框从行的上缘起（下缘由内容决定）。
+   */
+  align-items: stretch;
+}
+.kbw-set-row.is-plain { align-items: center; gap: var(--sp-2); padding: 4px 0; min-height: 0; }
+.kbw-set-label { flex: none; width: 168px; min-width: 0; }
+.kbw-set-label-t { font-size: var(--fs-3); color: var(--text-normal); }
+/**
+ * 每行那句解释 + 栏里其他"解释性灰字"（P6 第八段 ②）：**默认收起**。
+ *
+ * 🔴 收起 ≠ 删掉：行内那句同时挂在 `.kbw-set-label-t` 的 `title` 上（`kit.row()` 里挂的），
+ * 顶部那枚「显示说明」能一次性摊开。判据（离线 + 探针）认的是
+ * **`.kbw-set-label-t` 的 title 非空** + **默认不占位**（这个 `display:none`），
+ * 不是"文本里有没有那句话"（`textOf` 读得到藏起来的字 —— P6② 栽过）。
+ *
+ * 🔴 **为什么 P7.5 才敢写全量 `display:none`**（8.3 拆类名）：`.kbw-set-hint` 当年被
+ * **状态行**复用过（「已同步 / 有未保存的改动」·「统计中…」·「上次检查：…」）——
+ * 裸规则会把那些**反馈**一起藏掉，而它们恰恰是"点了之后有没有生效"的唯一说明，
+ * 当时的绕法是收窄到 `.kbw-set-label`。8.3 把状态行拆到 `.kbw-set-status`
+ *（`kit.ts` 的 `statusLine()`）之后，"解释"与"反馈"各有其类，这条限制才可以拆掉：
+ * 现在全量的 `.kbw-set-hint` 就是"解释"（含原先永远显示的那几处独立说明）。
+ */
+.kbw-set-hint {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  line-height: var(--lh-2);
+  margin-top: 2px;
+  display: none;
+}
+.kbw-set-shell.is-showsub .kbw-set-hint { display: block; }
+/**
+ * **状态 / 动态行**（P7.5 · 8.3 从 `.kbw-set-hint` 拆出）：**不吃「显示说明」开关** ——
+ * 它们是"点了之后有没有生效"的唯一说明，任何折叠态下都得在。
+ * 🔴 **这个类绝不许出现在任何 `display:none` 规则里**（`redline.ts` 静态钉着）。
+ */
+.kbw-set-status {
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  line-height: var(--lh-2);
+  margin-top: 2px;
+}
+/* 跳转过来点亮的那一行（搜索 → 点结果）——只加一层底色，不动布局 */
+.kbw-set-row.is-flash {
+  background: var(--background-modifier-hover);
+  border-radius: var(--radius-s, 4px);
+}
+.kbw-set-ctl { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.kbw-set-read {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  background: var(--recessed);
+  border-radius: var(--radius-s, 4px);
+  padding: var(--sp-1) var(--sp-2);
+  line-height: var(--lh-2);
+  /**
+   * **通栏到行的右缘**（P6b ⑧）：原先宽度由内容撑 → 两块灰底**宽度不一、左右都参差**
+   *（`flex: 1 1 auto` + `min-width: 0` 是"占满剩余宽度且允许收缩"的标准写法）。
+   */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.kbw-set-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.kbw-set-arrow { color: var(--text-faint); }
+
+/* ── 说明块 / 空态 / 工具条 ────────────────────────────────── */
+.kbw-set-note {
+  margin: var(--sp-2) 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-s, 4px);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  border-left: 3px solid var(--background-modifier-border);
+  background: var(--recessed);
+  color: var(--text-muted);
+}
+.kbw-set-note.is-warn { border-left-color: var(--color-yellow); color: var(--text-normal); }
+.kbw-set-note.is-error { border-left-color: var(--color-red); color: var(--text-normal); }
+.kbw-set-note.is-info { border-left-color: var(--color-blue); }
+.kbw-set-empty { padding: var(--sp-4) 0; color: var(--text-faint); font-size: var(--fs-2); }
+/* 会话列表（P7.3c 8.2）：一串 `row()`，与快照列表同一形态 */
+.kbw-set-sesslist { display: flex; flex-direction: column; }
+
+/* ── 「问 AI」就地回答的那一块（P6 第八段 ③）──────────────────── */
+.kbw-set-ai {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: var(--radius-s, 4px);
+  background: var(--recessed);
+  font-size: var(--fs-3);
+  line-height: var(--lh-2);
+  /* `white-space` 是**继承**属性 —— 显式写回来（P6③ 那条红线） */
+  white-space: normal;
+}
+.kbw-set-ai-t { font-size: var(--fs-2); color: var(--text-faint); }
+.kbw-set-ai-body > :first-child { margin-top: 0; }
+.kbw-set-ai-body > :last-child { margin-bottom: 0; }
+.kbw-set-ai-body p { margin: var(--sp-2) 0; }
+.kbw-set-ai-body ul, .kbw-set-ai-body ol { margin: var(--sp-2) 0; padding-left: 1.4em; }
+.kbw-set-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin: var(--sp-2) 0;
+}
+.kbw-set-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kbw-set-rows { display: flex; flex-direction: column; gap: 4px; }
+.kbw-set-issues { margin-top: var(--sp-4); }
+
+/* ── 表单（新建笔记对话框 / 问一句）────────────────────────── */
+.kbw-form { display: flex; flex-direction: column; gap: var(--sp-3); }
+.kbw-form-row { display: flex; gap: var(--sp-3); align-items: flex-start; }
+.kbw-form-row.is-plain { align-items: center; }
+.kbw-form-label { flex: none; width: 84px; padding-top: 6px; font-size: var(--fs-2); color: var(--text-muted); }
+.kbw-form-ctl { flex: 1; min-width: 0; }
+.kbw-form-hint { margin-top: 4px; font-size: var(--fs-1); color: var(--text-faint); line-height: var(--lh-2); }
+/* 状态行两档（P7.2c 剪藏：抓到了 / 没抓到）—— 只改颜色，版式与上面那一行同一个 */
+.kbw-form-hint.is-ok { color: var(--color-green, var(--text-muted)); }
+.kbw-form-hint.is-warn { color: var(--color-yellow, var(--text-muted)); }
+
+/* ── 挑一个（从笔记提取 / 选一篇）──────────────────────────── */
+.kbw-pick-list {
+  margin-top: var(--sp-2);
+  max-height: min(46vh, 380px);
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+}
+.kbw-pick-item {
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--background-modifier-border-hover, transparent);
+}
+.kbw-pick-item:last-child { border-bottom: none; }
+.kbw-pick-t { font-size: var(--fs-3); }
+.kbw-pick-d { font-size: var(--fs-1); color: var(--text-faint); }
+
+/**
+ * 快速切换（e2 期 §4.1）：键盘上下选中的那一行 —— 与看板 `.is-cursor` 同一套语义
+ *（"键盘走到哪一行"），但列表是浮层里的，不能借用看板那条选择器。
+ * ⚠️ 悬停态要包在 `@media (hover: hover)` 里（触屏点完会残留悬停态，项目红线）。
+ */
+.kbw-pick-item.is-cursor { background: var(--background-modifier-hover); }
+@media (hover: hover) {
+  .kbw-pick-item:hover { background: var(--background-modifier-hover); }
+}
+/** 类别小徽标（笔记 / 板块 / 命令）—— 一眼看出这行是什么 */
+.kbw-qs-kind {
+  display: inline-block;
+  min-width: 2.6em;
+  margin-right: 6px;
+  padding: 0 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* ── 日志行 ────────────────────────────────────────────────── */
+.kbw-log-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--background-modifier-border-hover, transparent);
+}
+.kbw-log-line1 { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.kbw-log-time { font-size: var(--fs-1); color: var(--text-faint); min-width: 66px; font-variant-numeric: tabular-nums; }
+.kbw-log-act { font-size: var(--fs-3); font-weight: 600; }
+.kbw-log-n { font-size: var(--fs-1); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.kbw-log-ai {
+  font-size: var(--fs-1);
+  color: var(--color-purple);
+  border: 1px solid var(--color-purple);
+  border-radius: var(--radius-s, 4px);
+  padding: 0 4px;
+}
+.kbw-log-sum { font-size: var(--fs-2); color: var(--text-muted); line-height: var(--lh-2); }
+.kbw-log-act-btns { display: flex; gap: 6px; }
+
+/* ⚠️ 这里原先有一条 `.kbw-flag.flag-green { color: var(--text-on-accent); background: var(--color-green) }`
+   —— 2026-09-28 语义色收口时删掉。两个理由，第二个才是真要紧的：
+   ① 它是"反色文字压满底"那个旧形态的残留（白字压绿：实测 2.02:1，不合格）；
+   ② 🔴 **它在 `STYLE_ORDER` 里排在 `components.css` 之后** —— 同权重谁赢看源码顺序，
+      留着它的话，`components.css` 里那条新规矩（色点 + `--text-normal` + 16% 淡底）
+      会被它**悄悄盖掉**，而界面上看着像"新样式对绿的那一档没生效"。
+   教训与本项目在 `.kbw-cards.has-h` 那条上吃过的一样：**改共用组件的样式，先搜一遍有没有第二处**。 */
+
+/* ── 外观（§7.5）：密度 / 动效 —— 由工作台根元素的 data-* 决定 ── */
+/* 密度：只改行高，不改列显隐（视图档管那个） */
+.kbw-root[data-density='compact'] .kbw-table .kbw-trow { height: 26px; }
+
+/* 动效：与 base.css 里 `prefers-reduced-motion` 那段同一套数值、同一份容器清单
+   （1ms 而不是 0，免得有代码等 transitionend 才收尾 —— 那些地方另有兜底定时器，见 notify.ts）。
+   P7.7（10.1）：插件档的标记 `data-motion` **同时挂 body**（`workbench-view.ts` 的
+   `applyAppearance`）—— 菜单/浮层/模态/通知/撤销条都挂在 body 上，只挂 root 的话
+   这一档对它们等于没开（盘点实测的洞）。
+   ⚠️ 只点名我们自己的容器，**绝不写 `[data-motion='reduce'] *` 裸选择器**（会打到整个 Obsidian）。 */
+.kbw-root[data-motion='reduce'] *,
+.kbw-root[data-motion='reduce'] *::before,
+.kbw-root[data-motion='reduce'] *::after,
+body[data-motion='reduce'] :is(.kbw-menu, .kbw-panel, .kbw-modal, .kbw-notices, .kbw-undobar-wrap),
+body[data-motion='reduce'] :is(.kbw-menu, .kbw-panel, .kbw-modal, .kbw-notices, .kbw-undobar-wrap) *,
+body[data-motion='reduce'] :is(.kbw-menu, .kbw-panel, .kbw-modal, .kbw-notices, .kbw-undobar-wrap) *::before,
+body[data-motion='reduce'] :is(.kbw-menu, .kbw-panel, .kbw-modal, .kbw-notices, .kbw-undobar-wrap) *::after,
+body[data-motion='reduce'] .kbw-backdrop {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+}
+
+/* 窄容器（原生设置面板那条坑的反面：自己写的面板只要让右栏能换行就够） */
+.kbw-root[data-w='narrow'] .kbw-set-shell { flex-direction: column; height: auto; max-height: none; }
+.kbw-root[data-w='narrow'] .kbw-set-rail {
+  width: auto;
+  flex-direction: row;
+  flex-wrap: wrap;
+  border-right: none;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: var(--sp-2);
+}
+
+/* 快捷键表里的「模块内固定键」那一节（a 期 §4.2）：不可改绑，所以只读展示 */
+.kbw-keys-fixed { margin-top: var(--sp-2); display: flex; flex-direction: column; gap: 2px; }
+.kbw-keys-fixed-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: var(--sp-3);
+  align-items: baseline;
+  font-size: var(--fs-2);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.kbw-keys-fixed-name { color: var(--text-normal); }
+.kbw-keys-fixed-key {
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── 快捷键表（D 期排版：按 scope 分组 + 帮助块）──────────────── */
+.kbw-keys-group td {
+  padding-top: var(--sp-4);
+  padding-bottom: var(--sp-1);
+  font-size: var(--fs-1);
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--text-muted);
+  text-transform: none;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.kbw-keys-help {
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--recessed);
+}
+.kbw-keys-help-t {
+  font-size: var(--fs-2);
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-top: var(--sp-2);
+}
+.kbw-keys-help-t:first-child { margin-top: 0; }
+.kbw-keys-help-p {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  line-height: var(--lh-3);
+}
+
+
+
+/* ── P7.2a：首页栏的"开关 + ↑↓"复合控件行 ───────────────────── */
+.kbw-set-ctl-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+
+/* ── P7.2b：命名模板（1.4）—— 输入 + 实时预览 + 变量 chips ─────
+   ⚠️ 全部选择器**收进 .kbw-set-main 作用域**：裸 .kbw-name 会撞上「全部笔记」名称列的
+   同名类（独立审 2026-10-03 🔴：display:flex 让 text-overflow:ellipsis 失效、徽标被挤到右端）。
+   redline.ts 有一条静态断言钉着「这里不许出现裸 .kbw-name」。 */
+.kbw-set-main .kbw-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.kbw-set-main .kbw-name .kbw-input {
+  width: 210px;
+  font-family: var(--font-monospace);
+}
+/* 非法态只改边框色：对错由下面那行提示说清楚（别把红黄刷满） */
+.kbw-set-main .kbw-name .kbw-input.is-warn {
+  border-color: var(--color-yellow);
+}
+.kbw-set-main .kbw-name-prev {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  white-space: normal;
+}
+.kbw-set-main .kbw-name-prev.is-warn {
+  color: var(--text-normal);
+}
+.kbw-set-main .kbw-name-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+.kbw-set-main .kbw-name-chips .kbw-chip {
+  font-family: var(--font-monospace);
+}
+.kbw-set-main .kbw-name-explain {
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+}
+.kbw-set-main .kbw-name-warn {
+  display: none;
+  font-size: var(--fs-2);
+  color: var(--text-warning, var(--color-yellow));
+  white-space: normal;
+  line-height: var(--lh-3);
+}
+.kbw-set-main .kbw-name-warn.is-on {
+  display: block;
+}
+
+
+/* ── P7.2b：帮助栏 · 教程中心（折叠卡 + 导出）────────────────── */
+.kbw-tut-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  margin-bottom: var(--sp-2);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.kbw-tut-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+}
+/* ⚠️ 顶层 :hover 必须包进 @media (hover: hover)（触屏点完会残留悬停态）——不写这一层会被静态红线当场抓住 */
+@media (hover: hover) {
+  .kbw-tut-head:hover {
+    background: var(--background-modifier-hover);
+  }
+}
+.kbw-tut-card.is-open {
+  border-color: var(--background-modifier-border-hover);
+}
+.kbw-tut-chev {
+  width: 14px;
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--fs-1);
+}
+.kbw-tut-tbox {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.kbw-tut-title {
+  font-size: var(--fs-3);
+  color: var(--text-normal);
+  font-weight: 600;
+}
+.kbw-tut-sub {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+}
+.kbw-tut-sp {
+  flex: 1;
+}
+/* 渲染出来的 Markdown：块级元素间距自己定（平台默认边距会把卡撑得很松；照 ai.css 的规矩） */
+.kbw-tut-body {
+  padding: 0 var(--sp-3) var(--sp-3) 30px;
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: var(--fs-2);
+  color: var(--text-muted);
+  line-height: var(--lh-3);
+  white-space: normal;
+}
+.kbw-tut-body > :first-child {
+  margin-top: var(--sp-2);
+}
+.kbw-tut-body p {
+  margin: var(--sp-2) 0;
+}
+.kbw-tut-body ul,
+.kbw-tut-body ol {
+  margin: var(--sp-2) 0;
+  padding-left: 1.4em;
+}
+.kbw-tut-body li {
+  margin: 2px 0;
+}
+.kbw-tut-body h1,
+.kbw-tut-body h2,
+.kbw-tut-body h3,
+.kbw-tut-body h4 {
+  margin: var(--sp-3) 0 var(--sp-1);
+  font-size: var(--fs-3);
+  color: var(--text-normal);
+}
+/* ── 教程配图（P7.10 · #8；`ui/settings/help.ts` 渲染）─────────────
+   ⚠️ 与向导配图（`styles/wizard.css` 的 `.kbw-wiz-img`）是**同一份图片呈现规矩**
+   （1px 边框 + 暗色下压一点亮度 —— 浅色截图不刺眼）：两处类名各自独立、**要成对改**。 */
+.kbw-tut-shot {
+  margin: var(--sp-2) 0;
+}
+/* 加载失败：整块（含可能的说明）藏掉 —— 缺图时文字自己站得住，不摆破图 */
+.kbw-tut-shot.is-missing {
+  display: none;
+}
+.kbw-tut-img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--surface-2);
+}
+body.theme-dark .kbw-tut-img {
+  filter: brightness(0.92);
+}
+
+/* P7.2b：「?」表每行的「一句人话」（1.6a）*/
+.kbw-keys-name { color: var(--text-normal); }
+.kbw-keys-desc {
+  font-size: var(--fs-2);
+  color: var(--text-faint);
+  white-space: normal;
+}

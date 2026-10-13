@@ -1,0 +1,32 @@
+# 离线套件 · 每推必跑
+#
+# 数据源 = **合成夹具**（`tests/fixture/` 的生成器，`npm test` 开跑前自动重建到
+# `tests/.fixture/`）—— 不依赖任何本机真库副本，所以 CI 与协作者机器开箱即用。
+#
+# 为什么先上 windows-latest：与开发机同口径（换行/路径行为一致）。
+# 核心四命令（build / typecheck / lint:probe / test）本来跨平台，稳了之后再评估换 ubuntu 提速。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint:probe
+      - run: npm run build
+      - run: npm test

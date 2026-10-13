@@ -1,0 +1,323 @@
+/* ══════════════════════════════════════════════════════════════════
+   shell · 工作台外壳（方案设计.md §5.3）
+   左导航 152px + 主内容区 + 导航底部状态区
+   窄容器由 JS 量 clientWidth 打 data-w（**不给容器加 container-type**，
+   否则它会成为 absolute/fixed 后代的包含块，打中「浮层从触发点展开」）
+   ══════════════════════════════════════════════════════════════════ */
+/* 🔴 **藏掉宿主的平台标题栏**（P7.0a 批 1③）：`.view-header`（← → 标题 ⋮）**停在旧模块名**
+   —— asar 取证：`.view-header-title` 只在视图 `load()` 里设一次，之后只订阅
+   `group-change` / `history-change`，**切模块不在其中**（`leaf.updateHeader()` 也刷不动它，
+   实测过；全文见 `workbench-view.ts` 的 `refreshTitle`）。
+   藏掉的三条理由：① 同一件事两个入口（我们顶栏已经在写模块名）；
+   ② 那两个 ← → 是文件历史导航，工作台没有文件历史，本来就是死路；③ 省 38px 竖向。
+   做法与内嵌图谱（`graph.css` 的 `.kbw-graph-stage .view-header`）和小窗
+   （`board.css` 的 `.kbw-cw-leaf .view-header`）**同一份**。
+   ⚠️ 锚点是视图在 `onOpen` 里自己贴的类（**不按 `data-type` 写** —— 图谱那次栽过：
+   挂上去的叶 `data-type` 不是我们的 → 真机零命中、离线假绿）。 */
+.kbw-workbench-leaf .view-header { display: none; }
+
+.kbw-shell {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── 舞台：左导航之外的全部（停靠宿主 + 主区）─────────────────────
+   d2 期加的这一层。为什么不是"`.kbw-shell` 直接三件"：底部停靠要求
+   `main` 与 `dock` **上下**排，而左导航得**通高** —— 三个平级 flex 子元素
+   做不到（shell 只能是 row 或 column 之一）。方向由 `data-dock` 切。 */
+.kbw-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.kbw-stage[data-dock="left"],
+.kbw-stage[data-dock="right"] { flex-direction: row; }
+.kbw-stage[data-dock="bottom"] { flex-direction: column; }
+
+/* 停靠宿主（`display` 与尺寸由 JS 写；不生效时它是 `display:none`）
+   ⚠️ 这里**不加 `container-type`** —— 面板是它的后代，加了会打中"浮层从触发点展开" */
+.kbw-dock {
+  flex: none;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-0);
+}
+.kbw-stage[data-dock="left"] .kbw-dock {
+  order: 0;
+  border-right: 1px solid var(--background-modifier-border);
+}
+.kbw-stage[data-dock="right"] .kbw-dock {
+  order: 2;
+  border-left: 1px solid var(--background-modifier-border);
+}
+.kbw-stage[data-dock="bottom"] .kbw-dock {
+  order: 2;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.kbw-stage[data-dock] .kbw-main { order: 1; }
+
+/* 拖分隔条改窗格大小 —— 命中区比看得见的线宽（1px 太难点） */
+.kbw-dock-grip {
+  position: absolute;
+  z-index: 2;
+  background: transparent;
+  transition: background var(--t-fast) var(--ease);
+}
+.kbw-stage[data-dock="left"] .kbw-dock-grip { top: 0; bottom: 0; right: 0; width: 6px; cursor: col-resize; }
+.kbw-stage[data-dock="right"] .kbw-dock-grip { top: 0; bottom: 0; left: 0; width: 6px; cursor: col-resize; }
+.kbw-stage[data-dock="bottom"] .kbw-dock-grip { left: 0; right: 0; top: 0; height: 6px; cursor: row-resize; }
+/* ⚠️ 顶层 `:hover` 必须就地包进 `@media (hover: hover)`（platform-pitfalls #36）——
+   否则触屏上点完会残留悬停态。停靠本身在触屏上不生效，但这条规则照样得按规矩写。 */
+@media (hover: hover) {
+  .kbw-dock-grip:hover { background: var(--interactive-accent); }
+}
+.kbw-dock-grip.is-dragging { background: var(--interactive-accent); }
+/* 拖动期间别让文字被选中（光标跑到编辑器里会跟着选一路） */
+.kbw-root.kbw-dock-resizing { user-select: none; }
+
+/* ── 左导航 ─────────────────────────────────────────────────── */
+.kbw-nav {
+  width: 152px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-3) 9px;
+  background: var(--surface-0);
+  border-right: 1px solid var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.kbw-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 9px var(--sp-4);
+  flex: none;
+  /**
+   * 🔴 **−3px：让「经纬 / 目录 / 全部笔记」三个列头的**中心**落在同一条线上**
+   *（P6 段⑥ ④-A 的对齐口径，真机量的：改前中心差 3px，`124 / 121 / 121`）。
+   *
+   * 为什么是 3px、为什么用负边距而不是改 padding：三个字的**字号不同**
+   *（品牌名 `--fs-6` 比顶栏标题 `--fs-5` 高一档）→ 行盒也更高。三处都是
+   * `align-items: center`（与设计稿 `.viewhead` 一致），于是**中心对齐时行盒高的那个
+   * 中心偏低**，差值正好是 (品牌行高 − 标题行高) / 2 = 3px。
+   *
+   * ⚠️ **字号不同时"中心对齐"与"基线对齐"不可能同时成立**，这里选**中心**
+   *（稿子的 `.viewhead` 就是 `align-items: center`；基线对齐是另一套，见
+   * `styles/settings.css` 的 `.kbw-set-group`）。选了中心，就得把这 3px 补掉 ——
+   * 否则"三列头同一基线"这句承诺在真机上是 3px 的谎。
+   */
+  margin-top: -3px;
+}
+.kbw-brand-mark { color: var(--interactive-accent); flex: none; }
+.kbw-brand-name {
+  font-size: var(--fs-6);
+  font-weight: 600;
+  letter-spacing: 5px;
+  text-indent: 2px;   /* 抵消末字后多出来的字距，视觉上才居中 */
+  line-height: var(--lh-1);
+  color: var(--text-normal);
+}
+
+.kbw-navitems {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.kbw-navitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 9px;
+  height: 32px;
+  border-radius: var(--radius-s, 4px);
+  font-size: var(--fs-3);
+  color: var(--text-muted);
+  text-align: left;
+  width: 100%;
+  transition: background var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+.kbw-navitem .kbw-ico { flex: none; opacity: .85; }
+.kbw-navitem.is-on {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-weight: 600;
+}
+.kbw-navitem.is-on .kbw-ico { opacity: 1; color: var(--interactive-accent); }
+.kbw-navitem.is-off { opacity: .45; }
+
+/* ── 底部状态区（§2.5 · P0 只渲不点，点击目标在 P1）──────────── */
+.kbw-navfoot {
+  flex: none;
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--background-modifier-border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-1);
+  color: var(--text-faint);
+  line-height: var(--lh-2);
+}
+.kbw-navfoot-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--radius-s, 4px);
+  width: 100%;
+  text-align: left;
+}
+.kbw-navfoot-row.is-clickable { cursor: pointer; }
+.kbw-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.kbw-dot.is-on { background: var(--color-green); }
+.kbw-dot.is-off { background: var(--text-faint); }
+
+/* ── 主内容区 ───────────────────────────────────────────────── */
+.kbw-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+}
+
+.kbw-topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: var(--sp-4) var(--sp-5) 0;
+}
+.kbw-topbar h2 {
+  margin: 0;
+  font-size: var(--fs-5);
+  font-weight: 600;
+  line-height: var(--lh-1);
+}
+.kbw-topbar .kbw-sub { font-size: var(--fs-2); color: var(--text-faint); }
+.kbw-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--sp-1); }
+
+.kbw-modhost {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── ⑧+④-A 「目录栏往上拓展」：从**灰带**改成**列头槽** ─────────────
+   P6b ⑧（用户 2026-09-27："中间目录那一栏往上拓展，两个灰色矩形框没对齐不好看"）
+   先用一段 `::before` 把灰底铺到顶、跟左侧导航连成一条通高带。
+
+   P6 段⑥ ④-A（用户 2026-09-28："中间那个灰框上面有点空"）指出那条带**没承担任何信息** ——
+   46px 全是空的，而中列真正该在最上面的「目录」二字被压在它下面（中列内容比左列低 42px）。
+   现在改成**列头槽**：顶栏里留出**同一格位置**，由模块把标题填进来。
+   结果三列的头（经纬 / 目录 / 全部笔记）落在**同一基线**，目录树头上多让出 42px。
+
+   🔴 **宽度只有一个真源**：`--kbw-col-w`。`.kbw-notes-side`（notes.css）与这个槽
+   **同读它** —— P6b 独立审查 A🔴2 那条真破绽（灰带 208 vs 目录栏 168）就是"两处各写一个数"
+   造成的，用变量把这一类错**从结构上**消掉，而不是靠注释提醒下次别忘。
+   档位：宽 208 · 中 168 · 触屏 168（见 mobile.css）· **窄档不画槽**（目录栏那时整个被藏了）。 */
+.kbw-root { --kbw-col-w: 208px; }
+.kbw-root[data-w='mid'] { --kbw-col-w: 168px; }
+
+/**
+ * 槽本体。**默认 `display: none`** —— 只有「全部笔记」会填它（下面那条 `:has()` 打开），
+ * 首页 / 看板 / 图谱不填，槽就不该占地方（否则那三屏的标题会被平白挤右 208px）。
+ */
+.kbw-colslot { display: none; }
+.kbw-main:has(.kbw-notes) .kbw-colslot {
+  display: flex;
+  align-items: center;
+  flex: none;
+  /**
+   * ⚠️ **`align-self: stretch` + 负上边距**：顶栏有 `padding-top: var(--sp-4)`，
+   * 光 stretch 的话槽只能铺到内容盒（46px 里的下面 30px），灰底会缺最上面一截。
+   * 负边距把它的上缘顶到这一行的**最顶上** —— 与改前那段 `::before`（`top:0; bottom:0`）等价。
+   */
+  align-self: stretch;
+  margin-top: calc(var(--sp-4) * -1);
+  /**
+   * 🔴 **`padding-top` 是必需的，不是装饰**（真机第一次跑量出来的）：槽的盒子铺满整行
+   * （46px，含顶栏的上内边距），而标题住在顶栏的**内容盒**里（下方 30px）——
+   * 两者都用 `align-items: center` 的话，槽里的「目录」会比标题**高 8px**
+   *（实测三列头中心 124 / **113** / 121）。补上这一截，槽的内容区就和顶栏的内容盒对齐了。
+   */
+  padding-top: var(--sp-4);
+  width: var(--kbw-col-w, 208px);
+  padding-left: var(--sp-3);
+  background: var(--surface-0);
+  border-right: 1px solid var(--background-modifier-border);
+  min-width: 0;
+}
+/**
+ * 槽在时，标题的左边距改由槽承担（`padding-left: 0`）。
+ * `h2` 那条里的 **9px 是 `.kbw-topbar` 的 `gap`** —— 槽 + gap + 这一截
+ * 正好等于改前的 `208 + sp-5`，所以**标题一个像素都没挪**（既有判据照旧成立）。
+ */
+.kbw-main:has(.kbw-notes) .kbw-topbar { padding-left: 0; }
+.kbw-main:has(.kbw-notes) .kbw-topbar h2 { margin-left: calc(var(--sp-5) - 9px); }
+.kbw-root[data-w='mid'] .kbw-main:has(.kbw-notes) .kbw-topbar h2 {
+  margin-left: calc(var(--sp-4) - 9px);
+}
+/**
+ * 窄档：目录栏整个不显示（`.kbw-notes-side` 那条）→ **槽也不画**
+ *（留着就是一条没有任何内容的灰带，正是 ④-A 要消掉的那个东西）。
+ */
+.kbw-root[data-w='narrow'] .kbw-main:has(.kbw-notes) .kbw-colslot { display: none; }
+.kbw-root[data-w='narrow'] .kbw-main:has(.kbw-notes) .kbw-topbar { padding-left: var(--sp-4); }
+.kbw-root[data-w='narrow'] .kbw-main:has(.kbw-notes) .kbw-topbar h2 { margin-left: 0; }
+/**
+ * 🔴 **触屏档**：`--kbw-col-w` 由 `mobile.css` 统一改成 168（与 `.kbw-notes-side` 同源），
+ * 这里只需要把标题那一截也跟上（原来那条 `body.is-mobile` 规则是拿来盖 208 的，现在不用盖了）。
+ */
+body.is-mobile .kbw-root .kbw-main:has(.kbw-notes) .kbw-topbar h2 {
+  margin-left: calc(var(--sp-4) - 9px);
+}
+body.is-mobile .kbw-root[data-w='narrow'] .kbw-main:has(.kbw-notes) .kbw-topbar h2 { margin-left: 0; }
+
+/* 模块切换过渡（决策 28）：120ms 淡入 + 4px 位移，方向跟导航位置一致 */
+@keyframes kbw-mod-down { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes kbw-mod-up { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.kbw-mod { flex: 1; min-height: 0; }
+.kbw-root[data-dir="down"] .kbw-mod { animation: kbw-mod-down var(--t-fast) var(--ease-enter); }
+.kbw-root[data-dir="up"] .kbw-mod { animation: kbw-mod-up var(--t-fast) var(--ease-enter); }
+
+/* ── 窄容器：两套口径分开（方案设计.md §5.8）─────────────────────
+   ① 布局按容器宽度（data-w，JS 打）  ② 触控尺寸按 body.is-mobile   */
+.kbw-root[data-w="mid"] .kbw-nav { width: 52px; padding-left: 6px; padding-right: 6px; }
+.kbw-root[data-w="mid"] .kbw-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+.kbw-root[data-w="mid"] .kbw-brand-name { display: none; }
+.kbw-root[data-w="mid"] .kbw-navitem { justify-content: center; padding: 0; }
+.kbw-root[data-w="mid"] .kbw-navitem-label { display: none; }
+.kbw-root[data-w="mid"] .kbw-navfoot { align-items: center; }
+.kbw-root[data-w="mid"] .kbw-navfoot-row { justify-content: center; padding: 3px 0; }
+.kbw-root[data-w="mid"] .kbw-navfoot-text { display: none; }
+
+/* 窄屏：导航变底部 tab 栏（§5.8 布局断点 <640） */
+.kbw-root[data-w="narrow"] .kbw-shell { flex-direction: column-reverse; }
+.kbw-root[data-w="narrow"] .kbw-nav {
+  width: 100%;
+  flex-direction: row;
+  align-items: center;
+  border-right: none;
+  border-top: 1px solid var(--background-modifier-border);
+  padding: var(--sp-1) var(--sp-2);
+}
+.kbw-root[data-w="narrow"] .kbw-brand { display: none; }
+.kbw-root[data-w="narrow"] .kbw-navitems { flex-direction: row; justify-content: space-around; }
+.kbw-root[data-w="narrow"] .kbw-navitem { flex-direction: column; gap: 2px; height: auto; padding: var(--sp-1) 0; justify-content: center; }
+.kbw-root[data-w="narrow"] .kbw-navitem-label { font-size: var(--fs-1); }
+.kbw-root[data-w="narrow"] .kbw-navfoot { display: none; }
+.kbw-root[data-w="narrow"] .kbw-topbar { padding: var(--sp-3) var(--sp-4) 0; }
+.kbw-root[data-w="narrow"] .kbw-modhost { padding: var(--sp-4); }
+
